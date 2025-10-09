@@ -1,0 +1,49 @@
+{
+  "run_intent": "general_discovery_and_prioritization",
+  "output_schema_version": "researcher.v2.3",
+
+  "idea_count": { "min": 5, "max": 12 },
+  "marketplaces": ["gumroad", "etsy"],
+  "currency": "USD",
+  "region": "US",
+  "time_window_days": 30,
+
+  "history": {
+    "titles": [],
+    "slugs": []
+  },
+
+  "constraints": {
+    "include_niches": ""
+  },
+
+
+  "diversification": {
+    "strategy": "thematic",
+    "require_internal_clusters": true,
+    "emit_clusters_in_output": false
+  },
+
+  "quality_rules": {
+    "require_counterpoints_for_A": true,
+    "min_demand_signals_for_A": 2,
+    "confidence_floor_for_A": 0.6,
+    "max_A_share": 0.4
+  },
+
+  "scoring": {
+    "formula_note": "roi_estimate = (reach * impact * confidence) / effort; apply risk_modifier after",
+    "risk_modifier_bounds": { "min": -0.20, "max": 0.05 }
+  },
+
+  "evidence": {
+    "allowable_sources": ["etsy", "gumroad", "reddit", "google_trends", "other"],
+    "reject_generic_claims": true
+  },
+
+  "emit": {
+    "json_only": true,
+    "no_markdown": true,
+    "strict_required_fields": true
+  }
+}

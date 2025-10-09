@@ -1,0 +1,77 @@
+# Dependencies
+node_modules/
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Build outputs
+dist/
+dist-ssr/
+ui/dist/
+build/
+*.local
+
+# Tauri
+src-tauri/target/
+src-tauri/Cargo.lock
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist-python/
+build-python/
+
+# Backend binaries
+backend/bin/
+backend/build/
+backend/dist/
+
+# Nuitka
+*.build/
+*.dist/
+*.onefile-build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Data and outputs
+data/
+output/
+*.zip
+
+# Secrets
+.env
+.env.local
+.env.*.local
+secrets.json
+api_keys.txt
+
+# OS
+Thumbs.db
+Desktop.ini

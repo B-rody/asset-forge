@@ -1,0 +1,211 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/researcher.v2_3.schema.json",
+  "title": "Researcher Output (v2.3, descriptive)",
+  "description": "Final structured output of the Researcher agent — provides validated idea data for the Bundle Planner, including pricing, competition, and prioritization metrics.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "generated_at", "model", "ideas"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "researcher.v2.3",
+      "description": "Semantic version of this schema. Increment when structure or field semantics change."
+    },
+
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp representing when this payload was generated."
+    },
+    "ideas": {
+      "type": "array",
+      "description": "List of evaluated digital product ideas, each containing descriptive, pricing, competition, and scoring data.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "niche",
+          "sub_niche",
+          "one_liner",
+          "value_prop",
+          "differentiation_angle",
+          "demand_signals",
+          "suggested_price_band",
+          "pricing_observed",
+          "competition_density",
+          "competing_count",
+          "reach",
+          "impact",
+          "confidence",
+          "effort",
+          "roi_estimate",
+          "priority",
+          "counterpoints",
+          "why_now"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for this idea (e.g., UUID or timestamped ID)."
+          },
+
+          "title": {
+            "type": "string",
+            "minLength": 5,
+            "description": "Concise, human-readable title for the product concept."
+          },
+
+          "niche": {
+            "type": "string",
+            "minLength": 3,
+            "description": "Primary market or topical category for this product idea."
+          },
+
+          "sub_niche": {
+            "type": "string",
+            "minLength": 3,
+            "description": "Refined subcategory or specialization within the broader niche."
+          },
+
+          "one_liner": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 160,
+            "description": "Short marketing-friendly summary expressing what the product is and why it matters."
+          },
+
+          "value_prop": {
+            "type": "string",
+            "minLength": 15,
+            "description": "Outcome-oriented description of the transformation or benefit the product delivers."
+          },
+
+          "differentiation_angle": {
+            "type": "string",
+            "minLength": 10,
+            "description": "Key aspect or innovation that distinguishes this idea from existing market alternatives."
+          },
+
+          "demand_signals": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 6 },
+            "description": "Observed phrases, listings, or data points that suggest active demand for this type of product."
+          },
+
+          "suggested_price_band": {
+            "type": "object",
+            "description": "Recommended pricing range for this idea based on perceived value and competitive positioning.",
+            "required": ["low", "high"],
+            "additionalProperties": false,
+            "properties": {
+              "low": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Lower boundary (USD) for the recommended sale price."
+              },
+              "high": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Upper boundary (USD) justified by feature completeness and perceived value."
+              }
+            }
+          },
+
+          "pricing_observed": {
+            "type": "object",
+            "description": "Observed price range (USD) for comparable existing products within the same niche.",
+            "required": ["low", "median", "high"],
+            "additionalProperties": false,
+            "properties": {
+              "low": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Lower observed price in the current market."
+              },
+              "median": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Typical median price or midpoint of comparable offerings."
+              },
+              "high": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Highest observed price among comparable listings."
+              }
+            }
+          },
+
+          "competition_density": {
+            "type": "string",
+            "enum": ["low", "moderate", "saturated"],
+            "description": "Qualitative market saturation level: 'low' = blue ocean, 'saturated' = heavy competition."
+          },
+
+          "competing_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Approximate number of directly competing products observed during research."
+          },
+
+          "reach": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5,
+            "description": "Estimated potential audience size (1 = narrow niche, 5 = mass-market)."
+          },
+
+          "impact": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5,
+            "description": "Expected value delivered per user (1 = minor improvement, 5 = major transformation)."
+          },
+
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Confidence (0–1) in the validity of assumptions based on supporting evidence."
+          },
+
+          "effort": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5,
+            "description": "Relative difficulty or complexity of building this product (1 = easy, 5 = high effort)."
+          },
+
+          "roi_estimate": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Preliminary ROI proxy, typically computed as (reach * impact * confidence) / effort."
+          },
+
+          "priority": {
+            "type": "string",
+            "enum": ["A", "B", "C"],
+            "description": "Priority tier for production: A = high-value opportunity, B = medium, C = low."
+          },
+
+          "counterpoints": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 5 },
+            "description": "Identified risks, potential objections, or execution challenges for this idea."
+          },
+
+          "why_now": {
+            "type": "string",
+            "minLength": 3,
+            "description": "Explanation of timing or trend alignment—why this opportunity is relevant now."
+          }
+        }
+      }
+    }
+  }
+}

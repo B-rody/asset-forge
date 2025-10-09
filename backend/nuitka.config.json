@@ -1,0 +1,17 @@
+{
+  "mode": "standalone",
+  "onefile": true,
+  "output-dir": "bin",
+  "output-filename": "assetforge_backend",
+  "assume-yes-for-downloads": true,
+  "enable-plugin": "anti-bloat",
+  "nofollow-import-to": [
+    "pytest",
+    "unittest",
+    "test"
+  ],
+  "include-package-data": [
+    "openai",
+    "pydantic"
+  ]
+}
