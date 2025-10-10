@@ -198,62 +198,26 @@ class BaseAgent(ABC):
             # Get event type safely without hard-coding
             event_type = getattr(event, 'type', 'unknown')
 
-            # Emit log event for UI display
-            emit({
-                "event": "log",
-                "step": self.agent_name,
-                "message": f"Processing: {event_type}"
-            })
+            # Only emit logs for key response lifecycle events
+            if event_type in ['response.created', 'response.in_progress', 'response.completed', 'response.failed', 'response.incomplete']:
+                emit({
+                    "event": "log",
+                    "step": self.agent_name,
+                    "message": f"Processing: {event_type}"
+                })
 
             # Extract output from response.completed event
             if event_type == 'response.completed':
-                self.logger.info(f"FINAL EVENT DETECTED: {event_type}")
-
-                # DEBUG: Show the event type/class
-                event_class = type(event).__name__
-                event_module = type(event).__module__
-                emit({"event": "log", "step": self.agent_name, "message": f"DEBUG: Event type = {event_module}.{event_class}"})
-
-                # DEBUG: Show the actual event object
-                emit({"event": "log", "step": self.agent_name, "message": f"DEBUG: Event attributes = {dir(event)}"})
-
-                # Try to convert event to dict/string
+            
+                # Extract output using correct path
                 try:
-                    event_str = str(event)
-                    emit({"event": "log", "step": self.agent_name, "message": f"DEBUG: Event str() = {event_str}"})
-                except Exception as e:
-                    emit({"event": "log", "step": self.agent_name, "message": f"DEBUG: str() failed = {e}"})
-
-                try:
-                    event_repr = repr(event)
-                    emit({"event": "log", "step": self.agent_name, "message": f"DEBUG: Event repr() = {event_repr}"})
-                except Exception as e:
-                    emit({"event": "log", "step": self.agent_name, "message": f"DEBUG: repr() failed = {e}"})
-
-                # Try model_dump() if it's a Pydantic model
-                if hasattr(event, 'model_dump'):
-                    try:
-                        event_dict = event.model_dump()
-                        emit({"event": "log", "step": self.agent_name, "message": f"DEBUG: Event dict = {event_dict}"})
-                    except Exception as e:
-                        emit({"event": "log", "step": self.agent_name, "message": f"DEBUG: model_dump() failed = {e}"})
-
-                # Extract output using correct path: event.response.output[0].content[0].text
-                try:
-                    if hasattr(event, 'response') and hasattr(event.response, 'output'):
-                        output_list = event.response.output
-                        if output_list and len(output_list) > 0:
-                            message = output_list[0]
-                            if hasattr(message, 'content') and message.content and len(message.content) > 0:
-                                content = message.content[0]
-                                if hasattr(content, 'text'):
-                                    final_output = content.text
-                                    self.logger.info(f"Successfully extracted output via event.response.output[0].content[0].text")
-                                    emit({"event": "log", "step": self.agent_name, "message": f"DEBUG: Extracted output (length={len(final_output)} chars)"})
+                    if hasattr(event, 'response') and hasattr(event.response, 'output_text'):
+                        final_output = event.response.output_text
+                        self.logger.info(f"Successfully extracted output from stream")
                 except Exception as e:
                     self.logger.error(f"Error extracting output: {e}")
-                    emit({"event": "log", "step": self.agent_name, "message": f"DEBUG: Extraction error = {e}"})
-
+                    emit({"event": "error", "step": self.agent_name, "message": f"Extraction error: {e}"})
+                
         # Validate we got output
         if not final_output:
             self.logger.error("No output received from stream")

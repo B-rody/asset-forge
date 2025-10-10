@@ -1,199 +1,641 @@
 """
-Database queries for bundle history
+Database queries for AssetForge pipeline
 """
 
 import sqlite3
+import json
 from typing import List, Optional, Dict, Any
+from datetime import datetime, timedelta
 from app.database.db import DatabaseManager
-from app.database.models import BundleRecord
+from app.database.models import (
+    Idea, Bundle, MakerOutput, UsedIdea, CreatedBundle, ResearchSession
+)
 from app.logger import setup_logger
 
 logger = setup_logger(__name__)
 
 
-class BundleQueries:
-    """CRUD operations for bundle records"""
+class ResearchQueries:
+    """Query operations for research sessions"""
 
     def __init__(self, db_manager: DatabaseManager):
         self.db = db_manager
 
-    def create(self, bundle: BundleRecord) -> bool:
-        """Insert new bundle record"""
+    def create_session(self, session_id: str, idea_count: int) -> bool:
+        """Create new research session"""
         try:
             conn = self.db.get_connection()
             cursor = conn.cursor()
 
             cursor.execute("""
-                INSERT INTO bundles (id, timestamp, mode, status, model, output_path, keywords, qa_score, error_message)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                bundle.id,
-                bundle.timestamp,
-                bundle.mode,
-                bundle.status,
-                bundle.model,
-                bundle.output_path,
-                bundle.keywords,
-                bundle.qa_score,
-                bundle.error_message
-            ))
+                INSERT INTO research_sessions (session_id, created_at, idea_count)
+                VALUES (?, ?, ?)
+            """, (session_id, datetime.now().isoformat(), idea_count))
 
             conn.commit()
-            logger.info(f"Created bundle record: {bundle.id}")
+            logger.info(f"Created research session: {session_id}")
             return True
 
         except sqlite3.IntegrityError:
-            logger.warning(f"Bundle record already exists: {bundle.id}")
+            logger.warning(f"Research session already exists: {session_id}")
             return False
         except sqlite3.Error as e:
-            logger.error(f"Failed to create bundle record: {e}", exc_info=True)
+            logger.error(f"Failed to create research session: {e}", exc_info=True)
             return False
 
-    def get_by_id(self, bundle_id: str) -> Optional[BundleRecord]:
+    def get_all(self, limit: int = 100) -> List[ResearchSession]:
+        """Fetch all research sessions (most recent first)"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT * FROM research_sessions
+                ORDER BY created_at DESC
+                LIMIT ?
+            """, (limit,))
+
+            rows = cursor.fetchall()
+            return [ResearchSession(**dict(row)) for row in rows]
+
+        except sqlite3.Error as e:
+            logger.error(f"Failed to fetch research sessions: {e}", exc_info=True)
+            return []
+
+
+class IdeaQueries:
+    """Query operations for ideas table (active inventory)"""
+
+    def __init__(self, db_manager: DatabaseManager):
+        self.db = db_manager
+
+    def create(self, idea: Idea) -> bool:
+        """Insert new idea"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                INSERT INTO ideas (
+                    idea_id, research_session_id, created_at,
+                    title, niche, sub_niche, priority, roi_estimate, idea_json
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                idea.idea_id, idea.research_session_id, idea.created_at,
+                idea.title, idea.niche, idea.sub_niche, idea.priority,
+                idea.roi_estimate, idea.idea_json
+            ))
+
+            conn.commit()
+            logger.info(f"Created idea: {idea.idea_id}")
+            return True
+
+        except sqlite3.IntegrityError:
+            logger.warning(f"Idea already exists: {idea.idea_id}")
+            return False
+        except sqlite3.Error as e:
+            logger.error(f"Failed to create idea: {e}", exc_info=True)
+            return False
+
+    def get_by_id(self, idea_id: str) -> Optional[Idea]:
+        """Fetch idea by ID"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("SELECT * FROM ideas WHERE idea_id = ?", (idea_id,))
+            row = cursor.fetchone()
+
+            if row:
+                return Idea(**dict(row))
+            return None
+
+        except sqlite3.Error as e:
+            logger.error(f"Failed to fetch idea: {e}", exc_info=True)
+            return None
+
+    def get_available_ideas(self, weeks_back: int = 8, priorities: List[str] = ["A", "B"]) -> List[Idea]:
+        """Get fresh unused ideas from recent research"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            cutoff_date = (datetime.now() - timedelta(weeks=weeks_back)).isoformat()
+            priority_placeholders = ','.join('?' for _ in priorities)
+
+            cursor.execute(f"""
+                SELECT * FROM ideas
+                WHERE created_at > ?
+                AND priority IN ({priority_placeholders})
+                ORDER BY priority ASC, roi_estimate DESC
+            """, (cutoff_date, *priorities))
+
+            rows = cursor.fetchall()
+            return [Idea(**dict(row)) for row in rows]
+
+        except sqlite3.Error as e:
+            logger.error(f"Failed to fetch available ideas: {e}", exc_info=True)
+            return []
+
+    def get_all(self, limit: int = 100) -> List[Idea]:
+        """Fetch all ideas (sorted by ROI)"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT * FROM ideas
+                ORDER BY priority ASC, roi_estimate DESC
+                LIMIT ?
+            """, (limit,))
+
+            rows = cursor.fetchall()
+            return [Idea(**dict(row)) for row in rows]
+
+        except sqlite3.Error as e:
+            logger.error(f"Failed to fetch ideas: {e}", exc_info=True)
+            return []
+
+    def get_historical_titles(self, weeks_back: int = 24) -> List[str]:
+        """Get historical idea titles for duplicate detection"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            cutoff_date = (datetime.now() - timedelta(weeks=weeks_back)).isoformat()
+
+            # Check both ideas and used_ideas tables
+            cursor.execute("""
+                SELECT title FROM ideas WHERE created_at > ?
+                UNION
+                SELECT title FROM used_ideas WHERE created_at > ?
+            """, (cutoff_date, cutoff_date))
+
+            rows = cursor.fetchall()
+            return [row["title"] for row in rows]
+
+        except sqlite3.Error as e:
+            logger.error(f"Failed to fetch historical titles: {e}", exc_info=True)
+            return []
+
+    def delete(self, idea_id: str) -> bool:
+        """Delete idea (used when moving to used_ideas)"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("DELETE FROM ideas WHERE idea_id = ?", (idea_id,))
+            conn.commit()
+
+            logger.info(f"Deleted idea: {idea_id}")
+            return cursor.rowcount > 0
+
+        except sqlite3.Error as e:
+            logger.error(f"Failed to delete idea: {e}", exc_info=True)
+            return False
+
+    def cleanup_expired(self, weeks_back: int = 8) -> int:
+        """Delete ideas older than specified weeks"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            cutoff_date = (datetime.now() - timedelta(weeks=weeks_back)).isoformat()
+
+            cursor.execute("DELETE FROM ideas WHERE created_at < ?", (cutoff_date,))
+            conn.commit()
+
+            deleted_count = cursor.rowcount
+            logger.info(f"Cleaned up {deleted_count} expired ideas")
+            return deleted_count
+
+        except sqlite3.Error as e:
+            logger.error(f"Failed to cleanup expired ideas: {e}", exc_info=True)
+            return 0
+
+
+class BundleQueries:
+    """Query operations for bundles table (active production)"""
+
+    def __init__(self, db_manager: DatabaseManager):
+        self.db = db_manager
+
+    def create(self, bundle: Bundle) -> bool:
+        """Insert new bundle"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                INSERT INTO bundles (
+                    bundle_id, idea_id, created_at, updated_at,
+                    current_step, status, error_message, planner_output
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                bundle.bundle_id, bundle.idea_id, bundle.created_at, bundle.updated_at,
+                bundle.current_step, bundle.status, bundle.error_message, bundle.planner_output
+            ))
+
+            conn.commit()
+            logger.info(f"Created bundle: {bundle.bundle_id}")
+            return True
+
+        except sqlite3.IntegrityError:
+            logger.warning(f"Bundle already exists: {bundle.bundle_id}")
+            return False
+        except sqlite3.Error as e:
+            logger.error(f"Failed to create bundle: {e}", exc_info=True)
+            return False
+
+    def get_by_id(self, bundle_id: str) -> Optional[Bundle]:
         """Fetch bundle by ID"""
         try:
             conn = self.db.get_connection()
             cursor = conn.cursor()
 
-            cursor.execute("SELECT * FROM bundles WHERE id = ?", (bundle_id,))
+            cursor.execute("SELECT * FROM bundles WHERE bundle_id = ?", (bundle_id,))
             row = cursor.fetchone()
 
             if row:
-                return BundleRecord(**dict(row))
+                return Bundle(**dict(row))
             return None
 
         except sqlite3.Error as e:
             logger.error(f"Failed to fetch bundle: {e}", exc_info=True)
             return None
 
-    def update_status(self, bundle_id: str, status: str, error_message: Optional[str] = None) -> bool:
-        """Update bundle status"""
-        try:
-            conn = self.db.get_connection()
-            cursor = conn.cursor()
-
-            cursor.execute("""
-                UPDATE bundles
-                SET status = ?, error_message = ?
-                WHERE id = ?
-            """, (status, error_message, bundle_id))
-
-            conn.commit()
-            logger.info(f"Updated bundle status: {bundle_id} -> {status}")
-            return cursor.rowcount > 0
-
-        except sqlite3.Error as e:
-            logger.error(f"Failed to update bundle status: {e}", exc_info=True)
-            return False
-
-    def update_completion(
+    def update_step(
         self,
         bundle_id: str,
-        output_path: str,
-        qa_score: Optional[float] = None
+        current_step: str,
+        status: str,
+        error_message: Optional[str] = None
     ) -> bool:
-        """Mark bundle as completed with output details"""
+        """Update bundle step and status"""
         try:
             conn = self.db.get_connection()
             cursor = conn.cursor()
 
             cursor.execute("""
                 UPDATE bundles
-                SET status = 'completed', output_path = ?, qa_score = ?
-                WHERE id = ?
-            """, (output_path, qa_score, bundle_id))
+                SET current_step = ?, status = ?, error_message = ?, updated_at = ?
+                WHERE bundle_id = ?
+            """, (current_step, status, error_message, datetime.now().isoformat(), bundle_id))
 
             conn.commit()
-            logger.info(f"Marked bundle as completed: {bundle_id}")
+            logger.info(f"Updated bundle step: {bundle_id} -> {current_step} ({status})")
             return cursor.rowcount > 0
 
         except sqlite3.Error as e:
-            logger.error(f"Failed to update bundle completion: {e}", exc_info=True)
+            logger.error(f"Failed to update bundle step: {e}", exc_info=True)
             return False
 
-    def get_all(self, limit: int = 100) -> List[BundleRecord]:
-        """Fetch all bundles (most recent first)"""
+    def update_planner_output(self, bundle_id: str, planner_output: str) -> bool:
+        """Update planner output"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                UPDATE bundles
+                SET planner_output = ?, updated_at = ?
+                WHERE bundle_id = ?
+            """, (planner_output, datetime.now().isoformat(), bundle_id))
+
+            conn.commit()
+            logger.info(f"Updated planner output for bundle: {bundle_id}")
+            return cursor.rowcount > 0
+
+        except sqlite3.Error as e:
+            logger.error(f"Failed to update planner output: {e}", exc_info=True)
+            return False
+
+    def get_by_step_and_status(self, current_step: str, status: str) -> List[Bundle]:
+        """Fetch bundles by step and status (e.g., ready for next step or failed)"""
         try:
             conn = self.db.get_connection()
             cursor = conn.cursor()
 
             cursor.execute("""
                 SELECT * FROM bundles
-                ORDER BY timestamp DESC
-                LIMIT ?
-            """, (limit,))
+                WHERE current_step = ? AND status = ?
+                ORDER BY updated_at DESC
+            """, (current_step, status))
 
             rows = cursor.fetchall()
-            return [BundleRecord(**dict(row)) for row in rows]
+            return [Bundle(**dict(row)) for row in rows]
 
         except sqlite3.Error as e:
             logger.error(f"Failed to fetch bundles: {e}", exc_info=True)
             return []
 
-    def get_by_status(self, status: str, limit: int = 100) -> List[BundleRecord]:
-        """Fetch bundles by status"""
+    def get_all(self, limit: int = 100) -> List[Bundle]:
+        """Fetch all bundles"""
         try:
             conn = self.db.get_connection()
             cursor = conn.cursor()
 
             cursor.execute("""
                 SELECT * FROM bundles
-                WHERE status = ?
-                ORDER BY timestamp DESC
+                ORDER BY updated_at DESC
                 LIMIT ?
-            """, (status, limit))
+            """, (limit,))
 
             rows = cursor.fetchall()
-            return [BundleRecord(**dict(row)) for row in rows]
+            return [Bundle(**dict(row)) for row in rows]
 
         except sqlite3.Error as e:
-            logger.error(f"Failed to fetch bundles by status: {e}", exc_info=True)
+            logger.error(f"Failed to fetch bundles: {e}", exc_info=True)
             return []
 
     def delete(self, bundle_id: str) -> bool:
-        """Delete bundle record"""
+        """Delete bundle (used when moving to created_bundles)"""
         try:
             conn = self.db.get_connection()
             cursor = conn.cursor()
 
-            cursor.execute("DELETE FROM bundles WHERE id = ?", (bundle_id,))
+            cursor.execute("DELETE FROM bundles WHERE bundle_id = ?", (bundle_id,))
             conn.commit()
 
-            logger.info(f"Deleted bundle record: {bundle_id}")
+            logger.info(f"Deleted bundle: {bundle_id}")
             return cursor.rowcount > 0
 
         except sqlite3.Error as e:
             logger.error(f"Failed to delete bundle: {e}", exc_info=True)
             return False
 
+
+class MakerQueries:
+    """Query operations for maker_outputs table"""
+
+    def __init__(self, db_manager: DatabaseManager):
+        self.db = db_manager
+
+    def create(self, maker: MakerOutput) -> bool:
+        """Insert new maker output"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                INSERT INTO maker_outputs (
+                    maker_id, bundle_id, created_at,
+                    output_dir, maker_output, is_packaged, packaged_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                maker.maker_id, maker.bundle_id, maker.created_at,
+                maker.output_dir, maker.maker_output,
+                1 if maker.is_packaged else 0, maker.packaged_at
+            ))
+
+            conn.commit()
+            logger.info(f"Created maker output: {maker.maker_id}")
+            return True
+
+        except sqlite3.IntegrityError:
+            logger.warning(f"Maker output already exists: {maker.maker_id}")
+            return False
+        except sqlite3.Error as e:
+            logger.error(f"Failed to create maker output: {e}", exc_info=True)
+            return False
+
+    def get_by_bundle_id(self, bundle_id: str) -> Optional[MakerOutput]:
+        """Fetch maker output by bundle ID"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("SELECT * FROM maker_outputs WHERE bundle_id = ?", (bundle_id,))
+            row = cursor.fetchone()
+
+            if row:
+                row_dict = dict(row)
+                row_dict['is_packaged'] = bool(row_dict['is_packaged'])
+                return MakerOutput(**row_dict)
+            return None
+
+        except sqlite3.Error as e:
+            logger.error(f"Failed to fetch maker output: {e}", exc_info=True)
+            return None
+
+    def mark_packaged(self, bundle_id: str) -> bool:
+        """Mark maker output as packaged"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                UPDATE maker_outputs
+                SET is_packaged = 1, packaged_at = ?
+                WHERE bundle_id = ?
+            """, (datetime.now().isoformat(), bundle_id))
+
+            conn.commit()
+            logger.info(f"Marked maker output as packaged: {bundle_id}")
+            return cursor.rowcount > 0
+
+        except sqlite3.Error as e:
+            logger.error(f"Failed to mark maker output as packaged: {e}", exc_info=True)
+            return False
+
+    def cleanup_old_packaged(self, days_back: int = 30) -> int:
+        """Delete packaged maker outputs older than specified days"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            cutoff_date = (datetime.now() - timedelta(days=days_back)).isoformat()
+
+            cursor.execute("""
+                DELETE FROM maker_outputs
+                WHERE is_packaged = 1 AND packaged_at < ?
+            """, (cutoff_date,))
+
+            conn.commit()
+
+            deleted_count = cursor.rowcount
+            logger.info(f"Cleaned up {deleted_count} old packaged maker outputs")
+            return deleted_count
+
+        except sqlite3.Error as e:
+            logger.error(f"Failed to cleanup old maker outputs: {e}", exc_info=True)
+            return 0
+
+
+class UsedIdeaQueries:
+    """Query operations for used_ideas table (archive)"""
+
+    def __init__(self, db_manager: DatabaseManager):
+        self.db = db_manager
+
+    def create(self, used_idea: UsedIdea) -> bool:
+        """Insert used idea"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                INSERT INTO used_ideas (
+                    idea_id, research_session_id, created_at, used_at, bundle_id,
+                    title, niche, sub_niche, priority, roi_estimate, idea_json
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                used_idea.idea_id, used_idea.research_session_id, used_idea.created_at,
+                used_idea.used_at, used_idea.bundle_id, used_idea.title, used_idea.niche,
+                used_idea.sub_niche, used_idea.priority, used_idea.roi_estimate, used_idea.idea_json
+            ))
+
+            conn.commit()
+            logger.info(f"Created used idea: {used_idea.idea_id}")
+            return True
+
+        except sqlite3.IntegrityError:
+            logger.warning(f"Used idea already exists: {used_idea.idea_id}")
+            return False
+        except sqlite3.Error as e:
+            logger.error(f"Failed to create used idea: {e}", exc_info=True)
+            return False
+
+    def get_all(self, limit: int = 100) -> List[UsedIdea]:
+        """Fetch all used ideas (most recent first)"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT * FROM used_ideas
+                ORDER BY used_at DESC
+                LIMIT ?
+            """, (limit,))
+
+            rows = cursor.fetchall()
+            return [UsedIdea(**dict(row)) for row in rows]
+
+        except sqlite3.Error as e:
+            logger.error(f"Failed to fetch used ideas: {e}", exc_info=True)
+            return []
+
+
+class CreatedBundleQueries:
+    """Query operations for created_bundles table (archive)"""
+
+    def __init__(self, db_manager: DatabaseManager):
+        self.db = db_manager
+
+    def create(self, bundle: CreatedBundle) -> bool:
+        """Insert created bundle"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                INSERT INTO created_bundles (
+                    bundle_id, idea_id, created_at, completed_at,
+                    planner_output, maker_output, packager_output,
+                    title, niche, output_path
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                bundle.bundle_id, bundle.idea_id, bundle.created_at, bundle.completed_at,
+                bundle.planner_output, bundle.maker_output, bundle.packager_output,
+                bundle.title, bundle.niche, bundle.output_path
+            ))
+
+            conn.commit()
+            logger.info(f"Created bundle archive: {bundle.bundle_id}")
+            return True
+
+        except sqlite3.IntegrityError:
+            logger.warning(f"Created bundle already exists: {bundle.bundle_id}")
+            return False
+        except sqlite3.Error as e:
+            logger.error(f"Failed to create bundle archive: {e}", exc_info=True)
+            return False
+
+    def get_by_id(self, bundle_id: str) -> Optional[CreatedBundle]:
+        """Fetch created bundle by ID"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("SELECT * FROM created_bundles WHERE bundle_id = ?", (bundle_id,))
+            row = cursor.fetchone()
+
+            if row:
+                return CreatedBundle(**dict(row))
+            return None
+
+        except sqlite3.Error as e:
+            logger.error(f"Failed to fetch created bundle: {e}", exc_info=True)
+            return None
+
+    def get_all(self, limit: int = 100) -> List[CreatedBundle]:
+        """Fetch all created bundles (most recent first)"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT * FROM created_bundles
+                ORDER BY completed_at DESC
+                LIMIT ?
+            """, (limit,))
+
+            rows = cursor.fetchall()
+            return [CreatedBundle(**dict(row)) for row in rows]
+
+        except sqlite3.Error as e:
+            logger.error(f"Failed to fetch created bundles: {e}", exc_info=True)
+            return []
+
+    def get_by_niche(self, niche: str, limit: int = 100) -> List[CreatedBundle]:
+        """Fetch created bundles by niche"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT * FROM created_bundles
+                WHERE niche = ?
+                ORDER BY completed_at DESC
+                LIMIT ?
+            """, (niche, limit))
+
+            rows = cursor.fetchall()
+            return [CreatedBundle(**dict(row)) for row in rows]
+
+        except sqlite3.Error as e:
+            logger.error(f"Failed to fetch bundles by niche: {e}", exc_info=True)
+            return []
+
     def get_stats(self) -> Dict[str, Any]:
-        """Get bundle statistics"""
+        """Get created bundle statistics"""
         try:
             conn = self.db.get_connection()
             cursor = conn.cursor()
 
             # Total count
-            cursor.execute("SELECT COUNT(*) as total FROM bundles")
+            cursor.execute("SELECT COUNT(*) as total FROM created_bundles")
             total = cursor.fetchone()["total"]
 
-            # Count by status
+            # Count by niche
             cursor.execute("""
-                SELECT status, COUNT(*) as count
-                FROM bundles
-                GROUP BY status
+                SELECT niche, COUNT(*) as count
+                FROM created_bundles
+                GROUP BY niche
+                ORDER BY count DESC
             """)
-            by_status = {row["status"]: row["count"] for row in cursor.fetchall()}
-
-            # Average QA score
-            cursor.execute("SELECT AVG(qa_score) as avg_qa FROM bundles WHERE qa_score IS NOT NULL")
-            avg_qa = cursor.fetchone()["avg_qa"]
+            by_niche = {row["niche"]: row["count"] for row in cursor.fetchall()}
 
             return {
                 "total": total,
-                "by_status": by_status,
-                "avg_qa_score": round(avg_qa, 2) if avg_qa else None
+                "by_niche": by_niche
             }
 
         except sqlite3.Error as e:
-            logger.error(f"Failed to get stats: {e}", exc_info=True)
-            return {"total": 0, "by_status": {}, "avg_qa_score": None}
+            logger.error(f"Failed to get created bundle stats: {e}", exc_info=True)
+            return {"total": 0, "by_niche": {}}

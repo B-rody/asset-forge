@@ -62,7 +62,7 @@ class ResearcherAgent(BaseAgent):
                     }
                 }
             )
-
+            
             # Handle streaming response
             emit({"event": "log", "step": self.agent_name, "message": "Processing stream..."})
             result = self._handle_stream(response, emit)

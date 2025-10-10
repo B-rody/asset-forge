@@ -24,31 +24,171 @@ class DatabaseManager:
             conn = self.get_connection()
             cursor = conn.cursor()
 
-            # Create bundles table
+            # ============================================
+            # ACTIVE INVENTORY (Work in Progress)
+            # ============================================
+
+            # Active idea pool (not yet used for bundles)
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS bundles (
-                    id TEXT PRIMARY KEY,
-                    timestamp INTEGER NOT NULL,
-                    mode TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    model TEXT,
-                    output_path TEXT,
-                    keywords TEXT,
-                    qa_score REAL,
-                    error_message TEXT
+                CREATE TABLE IF NOT EXISTS ideas (
+                    idea_id TEXT PRIMARY KEY,
+                    research_session_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+
+                    title TEXT NOT NULL,
+                    niche TEXT NOT NULL,
+                    sub_niche TEXT NOT NULL,
+                    priority TEXT NOT NULL,
+                    roi_estimate REAL NOT NULL,
+
+                    idea_json TEXT NOT NULL
                 )
             """)
 
-            # Create index on timestamp for faster queries
             cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_bundles_timestamp
-                ON bundles(timestamp DESC)
+                CREATE INDEX IF NOT EXISTS idx_ideas_priority
+                ON ideas(priority, roi_estimate DESC)
             """)
 
-            # Create index on status
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_ideas_created
+                ON ideas(created_at DESC)
+            """)
+
+            # Active bundles being produced
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS bundles (
+                    bundle_id TEXT PRIMARY KEY,
+                    idea_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+
+                    current_step TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    error_message TEXT,
+
+                    planner_output TEXT
+                )
+            """)
+
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_bundles_status
-                ON bundles(status)
+                ON bundles(status, current_step)
+            """)
+
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_bundles_idea
+                ON bundles(idea_id)
+            """)
+
+            # Maker outputs (tracks created assets on disk)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS maker_outputs (
+                    maker_id TEXT PRIMARY KEY,
+                    bundle_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+
+                    output_dir TEXT NOT NULL,
+                    maker_output TEXT NOT NULL,
+
+                    is_packaged INTEGER DEFAULT 0,
+                    packaged_at TEXT,
+
+                    FOREIGN KEY (bundle_id) REFERENCES bundles(bundle_id)
+                )
+            """)
+
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_maker_bundle
+                ON maker_outputs(bundle_id)
+            """)
+
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_maker_unpackaged
+                ON maker_outputs(is_packaged) WHERE is_packaged = 0
+            """)
+
+            # ============================================
+            # ARCHIVE (Completed Work)
+            # ============================================
+
+            # Used ideas (consumed by bundles)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS used_ideas (
+                    idea_id TEXT PRIMARY KEY,
+                    research_session_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    used_at TEXT NOT NULL,
+                    bundle_id TEXT NOT NULL,
+
+                    title TEXT NOT NULL,
+                    niche TEXT NOT NULL,
+                    sub_niche TEXT NOT NULL,
+                    priority TEXT NOT NULL,
+                    roi_estimate REAL NOT NULL,
+                    idea_json TEXT NOT NULL
+                )
+            """)
+
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_used_ideas_title
+                ON used_ideas(title)
+            """)
+
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_used_ideas_created
+                ON used_ideas(created_at DESC)
+            """)
+
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_used_ideas_bundle
+                ON used_ideas(bundle_id)
+            """)
+
+            # Completed bundles (ready to sell)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS created_bundles (
+                    bundle_id TEXT PRIMARY KEY,
+                    idea_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    completed_at TEXT NOT NULL,
+
+                    planner_output TEXT NOT NULL,
+                    maker_output TEXT NOT NULL,
+                    packager_output TEXT NOT NULL,
+
+                    title TEXT NOT NULL,
+                    niche TEXT NOT NULL,
+                    output_path TEXT NOT NULL
+                )
+            """)
+
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_created_bundles_completed
+                ON created_bundles(completed_at DESC)
+            """)
+
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_created_bundles_niche
+                ON created_bundles(niche)
+            """)
+
+            # ============================================
+            # METADATA (Optional lightweight tracking)
+            # ============================================
+
+            # Research session tracking
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS research_sessions (
+                    session_id TEXT PRIMARY KEY,
+                    created_at TEXT NOT NULL,
+                    idea_count INTEGER NOT NULL
+                )
+            """)
+
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_research_created
+                ON research_sessions(created_at DESC)
             """)
 
             conn.commit()
