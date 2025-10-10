@@ -17,8 +17,7 @@
         "all": false,
         "execute": true,
         "sidecar": false,
-        "open": true,
-        "scope": []
+        "open": "^((mailto:\\w+)|(tel:\\w+)|(https?://\\w+)|([A-Z]:\\\\|/|~/).*)"
       },
       "fs": {
         "all": false,
@@ -33,7 +32,8 @@
       "dialog": {
         "all": false,
         "open": true,
-        "save": false
+        "save": false,
+        "message": true
       }
     },
     "bundle": {

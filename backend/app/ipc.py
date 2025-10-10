@@ -120,6 +120,100 @@ class IPCServer:
                 "has_key": has_key
             })
 
+        elif cmd == "delete_api_key":
+            from app.security.keyring_store import delete_api_key
+            success = delete_api_key()
+            self.emit_event({
+                "event": "api_key_deleted",
+                "success": success
+            })
+
+        elif cmd == "get_output_folder":
+            from app.settings import settings
+            # Ensure output folder exists
+            settings.output_dir.mkdir(parents=True, exist_ok=True)
+            self.emit_event({
+                "event": "output_folder_status",
+                "current_path": str(settings.output_dir),
+                "default_path": str(settings.get_default_output_dir()),
+                "is_custom": str(settings.output_dir) != str(settings.get_default_output_dir())
+            })
+
+        elif cmd == "save_output_folder":
+            params = command.get("params", {})
+            folder_path = params.get("folder_path")
+
+            if not folder_path:
+                self.emit_error(None, "No folder path provided")
+                return
+
+            from pathlib import Path
+            from app.config_store import save_preference
+            from app.settings import settings
+
+            # Validate path
+            try:
+                path = Path(folder_path)
+
+                # Check if path exists
+                if not path.exists():
+                    self.emit_error(None, f"Path does not exist: {folder_path}")
+                    return
+
+                # Check if it's a directory
+                if not path.is_dir():
+                    self.emit_error(None, f"Path is not a directory: {folder_path}")
+                    return
+
+                # Check if writable (try to create a test file)
+                try:
+                    test_file = path / ".assetforge_test"
+                    test_file.touch()
+                    test_file.unlink()
+                except Exception as e:
+                    self.emit_error(None, f"Cannot write to directory: {str(e)}")
+                    return
+
+                # Save to config
+                success = save_preference(settings.config_dir, "output_folder", str(path))
+
+                if success:
+                    # Update settings in memory
+                    settings.output_dir = path
+                    settings.output_dir.mkdir(parents=True, exist_ok=True)
+
+                    self.emit_event({
+                        "event": "output_folder_saved",
+                        "success": True,
+                        "path": str(path)
+                    })
+                else:
+                    self.emit_error(None, "Failed to save output folder preference")
+
+            except Exception as e:
+                self.emit_error(None, f"Invalid path: {str(e)}")
+
+        elif cmd == "reset_output_folder":
+            from app.config_store import delete_preference
+            from app.settings import settings
+
+            # Delete saved preference
+            success = delete_preference(settings.config_dir, "output_folder")
+
+            if success:
+                # Reset to default in memory
+                default_dir = settings.get_default_output_dir()
+                settings.output_dir = default_dir
+                settings.output_dir.mkdir(parents=True, exist_ok=True)
+
+                self.emit_event({
+                    "event": "output_folder_reset",
+                    "success": True,
+                    "path": str(default_dir)
+                })
+            else:
+                self.emit_error(None, "Failed to reset output folder")
+
         else:
             self.emit_error(None, f"Unknown command: {cmd}")
     
@@ -127,8 +221,9 @@ class IPCServer:
         """Emit event to stdout (JSON-Lines format)"""
         try:
             json_bytes = orjson.dumps(event)
-            sys.stdout.write(json_bytes.decode('utf-8') + '\n')
-            sys.stdout.flush()
+            # Write bytes directly to buffer to avoid Windows cp1252 encoding issues
+            sys.stdout.buffer.write(json_bytes + b'\n')
+            sys.stdout.buffer.flush()
         except Exception as e:
             logger.error(f"Failed to emit event: {e}", exc_info=True)
     

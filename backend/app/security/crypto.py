@@ -4,10 +4,6 @@ Uses Fernet (symmetric encryption with AES-128)
 """
 
 from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
-from cryptography.hazmat.backends import default_backend
-import base64
 import os
 from pathlib import Path
 from app.settings import settings

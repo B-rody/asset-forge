@@ -1,18 +1,12 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://example.com/schemas/researcher.v2_3.schema.json",
   "title": "Researcher Output (v2.3, descriptive)",
   "description": "Final structured output of the Researcher agent — provides validated idea data for the Bundle Planner, including pricing, competition, and prioritization metrics.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "generated_at", "model", "ideas"],
+  "required": ["generated_at", "ideas"],
   "properties": {
-    "schema_version": {
-      "type": "string",
-      "const": "researcher.v2.3",
-      "description": "Semantic version of this schema. Increment when structure or field semantics change."
-    },
-
     "generated_at": {
       "type": "string",
       "format": "date-time",

@@ -84,28 +84,47 @@ export function AppShell() {
           setStepProgress((prev) => ({ ...prev, [event.step]: event.pct }));
         }
       } else if (event.event === "done") {
+        const success = event.success !== false; // Default to true if not specified
+
         setLogs((prev) => [
           ...prev,
           {
             timestamp: now,
-            message: "Pipeline completed successfully!",
-            type: "success",
+            message: success
+              ? "Pipeline completed successfully!"
+              : `Pipeline failed: ${event.error || "Unknown error"}`,
+            type: success ? "success" : "error",
           },
         ]);
 
-        // Mark final running step as success
+        // Mark final running step
         setSteps((prev) =>
-          prev.map((s) => (s.status === "running" ? { ...s, status: "success" as const } : s))
+          prev.map((s) =>
+            s.status === "running" || s.status === "error"
+              ? { ...s, status: success ? ("success" as const) : ("error" as const) }
+              : s
+          )
         );
 
-        setResult({
-          bundle_id: event.result?.bundle_id || "unknown",
-          output_path: event.result?.output_path || "unknown",
-          qa_score: 0.93,
-          status: "success",
-          runtime: "2m 15s",
-          file_count: 3,
-        });
+        if (success) {
+          setResult({
+            bundle_id: event.result?.bundle_id || "unknown",
+            output_path: event.result?.output_path || "unknown",
+            qa_score: 0.93,
+            status: "success",
+            runtime: "2m 15s",
+            file_count: 3,
+          });
+        } else {
+          setResult({
+            bundle_id: "failed",
+            output_path: "N/A",
+            qa_score: 0,
+            status: "error",
+            runtime: "N/A",
+            file_count: 0,
+          });
+        }
       } else if (event.event === "error") {
         setLogs((prev) => [
           ...prev,

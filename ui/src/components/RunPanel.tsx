@@ -1,18 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { Zap, Loader2, FolderOpen, ChevronDown, Target } from "lucide-react";
+import { Zap, FolderOpen, Target } from "lucide-react";
 import { open } from "@tauri-apps/api/dialog";
 import { open as openPath } from "@tauri-apps/api/shell";
 import { ipcClient } from "@/lib/ipc";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 type TabId = "one-click" | "history";
@@ -26,13 +18,34 @@ interface RunPanelProps {
 export function RunPanel({ activeTab, onRunStart, isRunning }: RunPanelProps) {
   const [useFocusedMode, setUseFocusedMode] = useState(false);
   const [keyword, setKeyword] = useState("");
-  const [model, setModel] = useState("gpt-4o");
-  const [reasoning, setReasoning] = useState("normal");
   const [outputFolder, setOutputFolder] = useState("");
+  const [defaultOutputFolder, setDefaultOutputFolder] = useState("");
+  const [isCustomPath, setIsCustomPath] = useState(false);
   const [mockMode, setMockMode] = useState(false);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
 
-  const reduceMotion = useReducedMotion();
+  // Load output folder on mount
+  useEffect(() => {
+    const loadOutputFolder = async () => {
+      const unsubscribe = ipcClient.subscribe((event) => {
+        if (event.event === "output_folder_status") {
+          unsubscribe();
+          const currentPath = event.current_path || "";
+          const defaultPath = event.default_path || "";
+          setOutputFolder(currentPath);
+          setDefaultOutputFolder(defaultPath);
+          setIsCustomPath(event.is_custom === true);
+        }
+      });
+
+      await ipcClient.sendCommand({ cmd: "get_output_folder" });
+
+      setTimeout(() => {
+        unsubscribe();
+      }, 2000);
+    };
+
+    loadOutputFolder();
+  }, []);
 
   const handleBrowseFolder = async () => {
     try {
@@ -41,25 +54,94 @@ export function RunPanel({ activeTab, onRunStart, isRunning }: RunPanelProps) {
         multiple: false,
         title: "Select Output Folder",
       });
+
       if (selected && typeof selected === "string") {
-        setOutputFolder(selected);
+        // Subscribe to save result
+        const unsubscribe = ipcClient.subscribe((event) => {
+          if (event.event === "output_folder_saved") {
+            unsubscribe();
+            if (event.success) {
+              setOutputFolder(event.path || selected);
+              setIsCustomPath(event.path !== defaultOutputFolder);
+            }
+          } else if (event.event === "error") {
+            unsubscribe();
+            alert(`Failed to save output folder: ${event.message}`);
+          }
+        });
+
+        // Save to backend
+        await ipcClient.sendCommand({
+          cmd: "save_output_folder",
+          params: { folder_path: selected }
+        });
+
+        setTimeout(() => {
+          unsubscribe();
+        }, 2000);
       }
     } catch (error) {
       console.error("Failed to open folder dialog:", error);
     }
   };
 
+  const handleResetToDefault = async () => {
+    try {
+      const unsubscribe = ipcClient.subscribe((event) => {
+        if (event.event === "output_folder_reset") {
+          unsubscribe();
+          if (event.success) {
+            setOutputFolder(event.path || defaultOutputFolder);
+            setIsCustomPath(false);
+          }
+        } else if (event.event === "error") {
+          unsubscribe();
+          alert(`Failed to reset output folder: ${event.message}`);
+        }
+      });
+
+      await ipcClient.sendCommand({ cmd: "reset_output_folder" });
+
+      setTimeout(() => {
+        unsubscribe();
+      }, 2000);
+    } catch (error) {
+      console.error("Failed to reset output folder:", error);
+    }
+  };
+
   const handleOpenOutputDir = async () => {
-    if (outputFolder) {
-      try {
-        await openPath(outputFolder);
-      } catch (error) {
-        console.error("Failed to open output directory:", error);
-      }
+    if (!outputFolder) {
+      alert("No output folder set");
+      return;
+    }
+
+    try {
+      await openPath(outputFolder);
+    } catch (error) {
+      console.error("Failed to open output directory:", error);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      alert(`Failed to open folder: ${errorMsg}\n\nPath: ${outputFolder}`);
     }
   };
 
   const handleRun = async () => {
+    // If not in mock mode, check for API key first
+    if (!mockMode) {
+      try {
+        // Check if API key exists
+        const hasKey = await checkApiKey();
+        if (!hasKey) {
+          alert("Please add your OpenAI API key in Settings before running the pipeline.");
+          return;
+        }
+      } catch (error) {
+        console.error("Failed to check API key:", error);
+        alert("Failed to verify API key. Please check your settings.");
+        return;
+      }
+    }
+
     onRunStart();
 
     if (useFocusedMode) {
@@ -72,9 +154,30 @@ export function RunPanel({ activeTab, onRunStart, isRunning }: RunPanelProps) {
       await ipcClient.sendCommand({
         cmd: "run_pipeline",
         mode: "one_click",
-        params: { model, reasoning, mockMode },
+        params: { mockMode },
       });
     }
+  };
+
+  const checkApiKey = async (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      // Subscribe to API key status event
+      const unsubscribe = ipcClient.subscribe((event) => {
+        if (event.event === "api_key_status") {
+          unsubscribe();
+          resolve(event.has_key === true);
+        }
+      });
+
+      // Send command to check
+      ipcClient.sendCommand({ cmd: "get_api_key" });
+
+      // Timeout after 2 seconds
+      setTimeout(() => {
+        unsubscribe();
+        resolve(false);
+      }, 2000);
+    });
   };
 
   // Keyboard shortcut listener (Ctrl+Enter or Cmd+Enter)
@@ -113,26 +216,6 @@ export function RunPanel({ activeTab, onRunStart, isRunning }: RunPanelProps) {
             </p>
           </div>
 
-          {/* AI Model select */}
-          <div className="space-y-2">
-            <Label htmlFor="model" className="font-medium text-sm">AI Model</Label>
-            <Select value={model} onValueChange={setModel}>
-              <SelectTrigger id="model">
-                <SelectValue placeholder="Select a model" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="gpt-4o">
-                  <span className="font-medium">GPT-4o</span>
-                  <span className="ml-2 text-xs text-muted-foreground">
-                    Recommended
-                  </span>
-                </SelectItem>
-                <SelectItem value="gpt-4o-mini">GPT-4o Mini (Faster)</SelectItem>
-                <SelectItem value="gpt-4-turbo">GPT-4 Turbo</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
           {/* Focus on specific niche toggle */}
           <div className="flex items-center space-x-2">
             <input
@@ -167,173 +250,102 @@ export function RunPanel({ activeTab, onRunStart, isRunning }: RunPanelProps) {
             </div>
           )}
 
-          {/* Advanced Settings (collapsible panel) */}
-          <div className="w-full">
-            {/* Header */}
-            <button
-              type="button"
-              onClick={() => setAdvancedOpen((v) => !v)}
-              aria-expanded={advancedOpen}
-              className="w-full flex items-center justify-between rounded-lg border border-slate-300 bg-white
-                         hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800/90 dark:hover:bg-slate-700/90
-                         transition-colors px-4 py-3 text-left focus:outline-none
-                         focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
-            >
-              <div className="min-w-0">
-                <div className="text-sm font-semibold text-slate-900 dark:text-slate-200">
-                  Advanced Settings
-                </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
-                  Adjust reasoning depth and choose your output folder
-                </div>
+          {/* Settings Panel */}
+          <div className="w-full rounded-lg border border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/60
+                          divide-y divide-slate-300/50 dark:divide-slate-700/50">
+            {/* Output Location */}
+            <div className="p-4 space-y-3">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-200">
+                  Output Location
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  All generated bundles will be saved here.
+                </p>
               </div>
-              <ChevronDown
-                className={cn(
-                  "h-4 w-4 text-slate-400 transition-transform duration-150 flex-shrink-0 ml-3",
-                  advancedOpen && "rotate-180 text-blue-400"
-                )}
-                aria-hidden="true"
-              />
-            </button>
 
-            {/* Animated body */}
-            <AnimatePresence initial={false}>
-              {advancedOpen && (
-                <motion.div
-                  key="adv-body"
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={
-                    reduceMotion
-                      ? { duration: 0 }
-                      : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
-                  }
-                  style={{ overflow: "hidden" }}
+              {/* Buttons */}
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleBrowseFolder}
+                  className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white
+                             dark:border-slate-600 dark:bg-slate-800 px-3 py-2 text-sm
+                             hover:border-blue-400 dark:hover:border-blue-500 transition-colors"
                 >
-                  <div className="mt-2 rounded-lg border border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/60
-                                  divide-y divide-slate-300/50 dark:divide-slate-700/50">
-                    {/* Reasoning Level */}
-                    <div className="p-4 space-y-2">
-                      <div>
-                        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-200">
-                          Reasoning Level
-                        </h3>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                          High is slower but more thorough.
-                        </p>
-                      </div>
-                      <fieldset className="flex items-center gap-4 pt-1">
-                        <label className="inline-flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="reasoning"
-                            className="accent-blue-500"
-                            checked={reasoning === "normal"}
-                            onChange={() => setReasoning("normal")}
-                          />
-                          <span className="text-sm text-slate-700 dark:text-slate-300">Normal</span>
-                        </label>
-                        <label className="inline-flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="reasoning"
-                            className="accent-blue-500"
-                            checked={reasoning === "high"}
-                            onChange={() => setReasoning("high")}
-                          />
-                          <span className="text-sm text-slate-700 dark:text-slate-300">
-                            High <span className="text-slate-500 dark:text-slate-400">(slower, more thorough)</span>
-                          </span>
-                        </label>
-                      </fieldset>
-                    </div>
+                  <FolderOpen className="h-4 w-4" />
+                  Browse…
+                </button>
 
-                    {/* Output Folder */}
-                    <div className="p-4 space-y-2">
-                      <div>
-                        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-200">
-                          Output Folder
-                        </h3>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                          Overrides the default for this run only.
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 pt-1">
-                        <button
-                          type="button"
-                          onClick={handleBrowseFolder}
-                          className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white
-                                     dark:border-slate-600 dark:bg-slate-800 px-3 py-2 text-sm
-                                     hover:border-blue-400 dark:hover:border-blue-500 transition-colors"
-                        >
-                          <FolderOpen className="h-4 w-4" />
-                          Browse…
-                        </button>
-                        <span className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                          {outputFolder ? (
-                            <>
-                              Using <span className="text-slate-700 dark:text-slate-300 font-medium">{outputFolder}</span>
-                            </>
-                          ) : (
-                            <>
-                              Using default <span className="text-slate-700 dark:text-slate-300 font-medium">/data</span>
-                            </>
-                          )}
-                        </span>
-                        {outputFolder && (
-                          <button
-                            type="button"
-                            onClick={handleOpenOutputDir}
-                            title="Open folder"
-                            className="rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800
-                                       px-2 py-2 hover:border-blue-400 dark:hover:border-blue-500 transition-colors"
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              className="h-4 w-4 text-slate-700 dark:text-slate-300"
-                              fill="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path d="M19 20H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2z" />
-                            </svg>
-                          </button>
-                        )}
-                      </div>
-                    </div>
+                {isCustomPath && (
+                  <button
+                    type="button"
+                    onClick={handleResetToDefault}
+                    className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white
+                               dark:border-slate-600 dark:bg-slate-800 px-3 py-2 text-sm
+                               hover:border-amber-400 dark:hover:border-amber-500 transition-colors"
+                    title="Reset to default location"
+                  >
+                    Reset to Default
+                  </button>
+                )}
 
-                    {/* Mock Mode */}
-                    <div className="p-4 space-y-2">
-                      <div className="flex items-center gap-3">
-                        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-200">
-                          Mock Mode (demo)
-                        </h3>
-                        <label className="relative inline-flex cursor-pointer items-center">
-                          <input
-                            type="checkbox"
-                            className="peer sr-only"
-                            checked={mockMode}
-                            onChange={(e) => setMockMode(e.target.checked)}
-                            aria-describedby="mock-desc"
-                          />
-                          <span className="h-4 w-8 rounded-full bg-slate-300 dark:bg-slate-700
-                                           peer-checked:bg-blue-500 dark:peer-checked:bg-blue-600
-                                           transition-colors
-                                           after:absolute after:left-0.5 after:top-0.5
-                                           after:h-3 after:w-3 after:rounded-full after:bg-white
-                                           after:transition-transform peer-checked:after:translate-x-3.5" />
-                        </label>
-                      </div>
-                      <p id="mock-desc" className="text-xs text-slate-500 dark:text-slate-400">
-                        {mockMode
-                          ? "ON — Generates sample bundle; skips API calls."
-                          : "OFF — Runs full AI pipeline."}
-                      </p>
-                    </div>
-                  </div>
-                </motion.div>
+                <button
+                  type="button"
+                  onClick={handleOpenOutputDir}
+                  disabled={!outputFolder}
+                  className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white
+                             dark:border-slate-600 dark:bg-slate-800 px-3 py-2 text-sm
+                             hover:border-blue-400 dark:hover:border-blue-500 transition-colors
+                             disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Open folder in file explorer"
+                >
+                  <FolderOpen className="h-4 w-4" />
+                  Open
+                </button>
+              </div>
+
+              {/* Path Display */}
+              {outputFolder && (
+                <div className={cn(
+                  "mt-2 rounded-md border px-3 py-2 text-xs font-mono break-all",
+                  isCustomPath
+                    ? "border-blue-300 bg-blue-50 text-blue-900 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-200"
+                    : "border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                )}>
+                  {outputFolder}
+                </div>
               )}
-            </AnimatePresence>
+            </div>
+
+            {/* Mock Mode */}
+            <div className="p-4 space-y-2">
+              <div className="flex items-center gap-3">
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-200">
+                  Mock Mode (demo)
+                </h3>
+                <label className="relative inline-flex cursor-pointer items-center">
+                  <input
+                    type="checkbox"
+                    className="peer sr-only"
+                    checked={mockMode}
+                    onChange={(e) => setMockMode(e.target.checked)}
+                    aria-describedby="mock-desc"
+                  />
+                  <span className="h-4 w-8 rounded-full bg-slate-300 dark:bg-slate-700
+                                   peer-checked:bg-blue-500 dark:peer-checked:bg-blue-600
+                                   transition-colors
+                                   after:absolute after:left-0.5 after:top-0.5
+                                   after:h-3 after:w-3 after:rounded-full after:bg-white
+                                   after:transition-transform peer-checked:after:translate-x-3.5" />
+                </label>
+              </div>
+              <p id="mock-desc" className="text-xs text-slate-500 dark:text-slate-400">
+                {mockMode
+                  ? "ON — Generates sample bundle; skips API calls."
+                  : "OFF — Runs full AI pipeline."}
+              </p>
+            </div>
           </div>
 
           {/* Contextual Hint */}
@@ -346,6 +358,7 @@ export function RunPanel({ activeTab, onRunStart, isRunning }: RunPanelProps) {
           {/* Generate Button */}
           <div className="relative">
             <Button
+              type="button"
               onClick={isRunning ? undefined : handleRun}
               aria-busy={isRunning}
               aria-disabled={isRunning}

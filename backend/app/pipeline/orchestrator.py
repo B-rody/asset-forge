@@ -3,15 +3,19 @@ Pipeline Orchestrator
 Coordinates the execution of all pipeline agents using OpenAI
 """
 
+import asyncio
 from datetime import datetime
+from functools import partial
 from typing import Dict, Any, Callable
 from pathlib import Path
 
-from logging import Logger
 from app.logger import setup_logger
 from app.settings import settings
 from app.database import DatabaseManager, BundleRecord, BundleQueries
-from agents import ResearcherAgent, PlannerAgent, MakerAgent, PackagerAgent
+from app.pipeline.agents.researcher import ResearcherAgent
+# from app.pipeline.agents.planner import PlannerAgent
+# from app.pipeline.agents.maker import MakerAgent
+# from app.pipeline.agents.packager import PackagerAgent
 
 logger = setup_logger(__name__)
 
@@ -21,13 +25,67 @@ class PipelineOrchestrator:
 
     def __init__(self):
         self.researcher = ResearcherAgent()
-        self.planner = PlannerAgent()
-        self.maker = MakerAgent()
-        self.packager = PackagerAgent()
+        #self.planner = PlannerAgent()
+        #self.maker = MakerAgent()
+        #self.packager = PackagerAgent()
 
         # Initialize database
         self.db_manager = DatabaseManager(settings.db_path)
         self.bundle_queries = BundleQueries(self.db_manager)
-    
-    async def run_research():
-        Logger.info("Running Researcher Agent")
+
+    async def run_pipeline(
+        self,
+        mode: str,
+        params: Dict[str, Any],
+        emit: Callable[[Dict[str, Any]], None]
+    ):
+        """
+        Run the full pipeline (for now, just researcher)
+
+        Args:
+            mode: "one_click" or "focused"
+            params: Parameters from frontend (model, keyword, etc.)
+            emit: Callback to send events to frontend
+        """
+        logger.info(f"Starting pipeline in {mode} mode")
+        emit({"event": "log", "step": "orchestrator", "message": f"Starting {mode} pipeline..."})
+
+        try:
+            # Step 1: Run researcher
+            emit({"event": "progress", "step": "researcher", "pct": 0})
+
+            # Extract params for researcher
+            focus = mode == "focused"
+            niches = params.get("keyword", "") if focus else ""
+
+            # Run researcher in thread pool (sync agent in async context)
+            loop = asyncio.get_event_loop()
+            research_results = await loop.run_in_executor(
+                None,
+                partial(self.researcher.execute, emit=emit, focus=focus, niches=niches)
+            )
+
+            emit({"event": "progress", "step": "researcher", "pct": 100})
+            emit({"event": "log", "step": "orchestrator", "message": "Research complete"})
+
+            # TODO: Add planner, maker, packager steps
+
+            # Emit done event
+            emit({
+                "event": "done",
+                "success": True,
+                "result": {
+                    "bundle_id": "test-bundle",
+                    "research": research_results
+                }
+            })
+
+        except Exception as e:
+            logger.error(f"Pipeline failed: {e}", exc_info=True)
+
+            # Emit done event with failure status (don't re-raise)
+            emit({
+                "event": "done",
+                "success": False,
+                "error": str(e)
+            })

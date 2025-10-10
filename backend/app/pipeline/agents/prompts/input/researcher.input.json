@@ -14,7 +14,7 @@
   },
 
   "constraints": {
-    "include_niches": ""
+    "niches": ""
   },
 
 
