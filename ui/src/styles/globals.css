@@ -171,4 +171,27 @@
     background-size: 200% 100%;
     animation: shimmerOnce 0.9s ease 1;
   }
+
+  /* Animated dots for processing indicator */
+  @keyframes dots {
+    0%, 20% {
+      opacity: 0;
+    }
+    40% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+
+  .animate-dots {
+    display: inline-block;
+  }
+
+  .animate-dots::after {
+    content: '...';
+    display: inline-block;
+    animation: dots 1.4s infinite;
+  }
 }

@@ -5,9 +5,10 @@ import { RunPanel } from "./RunPanel";
 import { ResultPanel } from "./ResultPanel";
 import { StepChips } from "./StepChips";
 import { LogStream } from "./LogStream";
+import { LibraryPanel } from "./LibraryPanel";
 import { ipcClient, IPCEvent } from "@/lib/ipc";
 
-type TabId = "one-click" | "history";
+type TabId = "one-click" | "library" | "history";
 
 interface StepChip {
   name: string;
@@ -32,6 +33,7 @@ export function AppShell() {
   const [stepProgress, setStepProgress] = useState<Record<string, number>>({});
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [result, setResult] = useState<any>(null);
+  const [pipelineStartTime, setPipelineStartTime] = useState<number | null>(null);
 
   // Determine if pipeline is running
   const isPipelineRunning = steps.some((s) => s.status === "running");
@@ -54,8 +56,8 @@ export function AppShell() {
 
         // Update step status: mark previous running step as complete, start new step
         if (event.step) {
-          setSteps((prev) =>
-            prev.map((s) => {
+          setSteps((prev) => {
+            const newSteps = prev.map((s) => {
               if (s.name === event.step) {
                 return { ...s, status: "running" as const };
               } else if (s.status === "running") {
@@ -63,8 +65,15 @@ export function AppShell() {
                 return { ...s, status: "success" as const };
               }
               return s;
-            })
-          );
+            });
+
+            // Set start time if this is the first step to run
+            if (prev.every((s) => s.status === "pending")) {
+              setPipelineStartTime(Date.now());
+            }
+
+            return newSteps;
+          });
           // Reset progress for new step
           setStepProgress((prev) => ({ ...prev, [event.step]: 0 }));
         }
@@ -106,6 +115,9 @@ export function AppShell() {
           )
         );
 
+        // Clear pipeline start time
+        setPipelineStartTime(null);
+
         if (success) {
           setResult({
             bundle_id: event.result?.bundle_id || "unknown",
@@ -143,6 +155,9 @@ export function AppShell() {
             )
           );
         }
+
+        // Clear pipeline start time on error
+        setPipelineStartTime(null);
       }
     });
 
@@ -160,6 +175,7 @@ export function AppShell() {
     setStepProgress({});
     setLogs([]);
     setResult(null);
+    setPipelineStartTime(null);
   };
 
   return (
@@ -169,23 +185,40 @@ export function AppShell() {
         <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
         <main className="flex-1 overflow-y-auto p-6">
           <div className="mx-auto max-w-5xl xl:max-w-6xl 2xl:max-w-7xl space-y-6">
-            <RunPanel activeTab={activeTab} onRunStart={handleRunStart} isRunning={isPipelineRunning} />
-
-            <div className="rounded-lg border border-border bg-card p-6">
-              <h2 className="mb-4 text-lg font-semibold">Pipeline Status</h2>
-              <StepChips steps={steps} stepProgress={stepProgress} />
-            </div>
-
-            <div className="grid gap-6 lg:grid-cols-2">
-              <div className="rounded-lg border border-border bg-card p-6">
-                <h2 className="mb-4 text-lg font-semibold">Logs</h2>
-                <div className="h-64">
-                  <LogStream logs={logs} />
+            {activeTab === "library" ? (
+              <LibraryPanel />
+            ) : activeTab === "history" ? (
+              <div className="rounded-xl border border-border bg-gradient-to-b from-white to-slate-50 dark:from-slate-900 dark:to-slate-950 p-6 shadow-sm">
+                <h2 className="mb-2 text-lg font-semibold">Previous Runs</h2>
+                <div className="text-sm text-muted-foreground">
+                  <p>No previous runs yet. Start a generation to see history.</p>
                 </div>
               </div>
+            ) : (
+              <>
+                <RunPanel activeTab={activeTab} onRunStart={handleRunStart} isRunning={isPipelineRunning} />
 
-              <ResultPanel result={result} />
-            </div>
+                <div className="rounded-lg border border-border bg-card p-6">
+                  <h2 className="mb-4 text-lg font-semibold">Pipeline Status</h2>
+                  <StepChips steps={steps} stepProgress={stepProgress} />
+                </div>
+
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <div className="rounded-lg border border-border bg-card p-6">
+                    <h2 className="mb-4 text-lg font-semibold">Logs</h2>
+                    <div className="h-64">
+                      <LogStream
+                        logs={logs}
+                        isProcessing={isPipelineRunning}
+                        startTime={pipelineStartTime}
+                      />
+                    </div>
+                  </div>
+
+                  <ResultPanel result={result} />
+                </div>
+              </>
+            )}
           </div>
         </main>
       </div>

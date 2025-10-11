@@ -11,7 +11,7 @@ from pathlib import Path
 
 from app.logger import setup_logger
 from app.settings import settings
-from app.database import DatabaseManager, BundleRecord, BundleQueries
+from app.database import DatabaseManager, BundleQueries
 from app.pipeline.agents.researcher import ResearcherAgent
 # from app.pipeline.agents.planner import PlannerAgent
 # from app.pipeline.agents.maker import MakerAgent
@@ -24,14 +24,15 @@ class PipelineOrchestrator:
     """Orchestrates the execution of all pipeline steps with real OpenAI integration"""
 
     def __init__(self):
-        self.researcher = ResearcherAgent()
-        #self.planner = PlannerAgent()
-        #self.maker = MakerAgent()
-        #self.packager = PackagerAgent()
-
         # Initialize database
         self.db_manager = DatabaseManager(settings.db_path)
         self.bundle_queries = BundleQueries(self.db_manager)
+
+        # Initialize agents with database access
+        self.researcher = ResearcherAgent(db_manager=self.db_manager)
+        #self.planner = PlannerAgent(db_manager=self.db_manager)
+        #self.maker = MakerAgent(db_manager=self.db_manager)
+        #self.packager = PackagerAgent(db_manager=self.db_manager)
 
     async def run_pipeline(
         self,
@@ -48,11 +49,12 @@ class PipelineOrchestrator:
             emit: Callback to send events to frontend
         """
         logger.info(f"Starting pipeline in {mode} mode")
-        emit({"event": "log", "step": "orchestrator", "message": f"Starting {mode} pipeline..."})
+        emit({"event": "log", "step": "Orchestrator", "message": f"Starting {mode} pipeline..."})
 
         try:
             # Step 1: Run researcher
-            emit({"event": "progress", "step": "researcher", "pct": 0})
+            emit({"event": "log", "step": "Researcher", "message": "Starting research..."})
+            emit({"event": "progress", "step": "Researcher", "pct": 0})
 
             # Extract params for researcher
             focus = mode == "focused"
@@ -65,8 +67,8 @@ class PipelineOrchestrator:
                 partial(self.researcher.execute, emit=emit, focus=focus, niches=niches)
             )
 
-            emit({"event": "progress", "step": "researcher", "pct": 100})
-            emit({"event": "log", "step": "orchestrator", "message": "Research complete"})
+            emit({"event": "progress", "step": "Researcher", "pct": 100})
+            emit({"event": "log", "step": "Orchestrator", "message": "Research complete"})
 
             # TODO: Add planner, maker, packager steps
 

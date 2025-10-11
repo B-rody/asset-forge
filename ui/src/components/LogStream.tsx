@@ -11,15 +11,18 @@ interface LogEntry {
 
 interface LogStreamProps {
   logs: LogEntry[];
+  isProcessing?: boolean;
+  startTime?: number | null;
 }
 
 type LogFilter = "all" | "info" | "warnings" | "errors";
 
-export function LogStream({ logs }: LogStreamProps) {
+export function LogStream({ logs, isProcessing = false, startTime = null }: LogStreamProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
   const [filter, setFilter] = useState<LogFilter>("all");
   const [copied, setCopied] = useState(false);
+  const [elapsedTime, setElapsedTime] = useState<string>("0s");
 
   // Detect manual scroll
   const handleScroll = () => {
@@ -51,6 +54,34 @@ export function LogStream({ logs }: LogStreamProps) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [logs, autoScroll]);
+
+  // Timer for elapsed time
+  useEffect(() => {
+    if (!isProcessing || !startTime) {
+      setElapsedTime("0s");
+      return;
+    }
+
+    const updateElapsedTime = () => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      const minutes = Math.floor(elapsed / 60);
+      const seconds = elapsed % 60;
+
+      if (minutes > 0) {
+        setElapsedTime(`${minutes}m ${seconds}s`);
+      } else {
+        setElapsedTime(`${seconds}s`);
+      }
+    };
+
+    // Update immediately
+    updateElapsedTime();
+
+    // Update every second
+    const interval = setInterval(updateElapsedTime, 1000);
+
+    return () => clearInterval(interval);
+  }, [isProcessing, startTime]);
 
   // Filter logs
   const filteredLogs = logs.filter((log) => {
@@ -147,6 +178,18 @@ export function LogStream({ logs }: LogStreamProps) {
                 </span>
               </div>
             ))}
+
+            {/* Processing indicator */}
+            {isProcessing && (
+              <div className="flex gap-2 mt-3 pt-3 border-t border-border/50">
+                <span className="text-blue-600 dark:text-blue-400 font-medium">
+                  Processing<span className="animate-dots">...</span>
+                  <span className="ml-2 text-muted-foreground font-normal">
+                    ({elapsedTime})
+                  </span>
+                </span>
+              </div>
+            )}
           </div>
         )}
       </div>

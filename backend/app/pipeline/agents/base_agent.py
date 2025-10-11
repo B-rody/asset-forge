@@ -5,12 +5,16 @@ Provides common functionality for all pipeline agents
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Optional, Callable, TYPE_CHECKING
 import json
 import jsonschema
+import re
 from openai import OpenAI
 
 from app.logger import setup_logger
+
+if TYPE_CHECKING:
+    from app.database.db import DatabaseManager
 
 
 class BaseAgent(ABC):
@@ -20,15 +24,17 @@ class BaseAgent(ABC):
     All agents should inherit from this class and implement the execute() method.
     """
 
-    def __init__(self, agent_name: str):
+    def __init__(self, agent_name: str, db_manager: Optional["DatabaseManager"] = None):
         """
         Initialize base agent with common setup.
 
         Args:
             agent_name: Name of the agent (e.g., 'researcher', 'planner', 'maker', 'packager')
+            db_manager: Optional database manager for persistence (enables _save_result)
         """
         self.agent_name = agent_name
         self._client: Optional[OpenAI] = None  # Private attribute for lazy loading
+        self.db_manager = db_manager
         self.logger = setup_logger(f"agent.{agent_name}")
 
         # Load instructions automatically
@@ -58,6 +64,76 @@ class BaseAgent(ABC):
                 self.logger.error(f"Failed to initialize OpenAI client: {e}")
                 raise
         return self._client
+
+    @property
+    def step_name(self) -> str:
+        """
+        Returns the capitalized step name for frontend display.
+
+        Returns:
+            str: Capitalized agent name (e.g., 'researcher' -> 'Researcher')
+        """
+        return self.agent_name.capitalize()
+
+    @property
+    def research_queries(self):
+        """Lazy-load research queries (requires db_manager)"""
+        if not self.db_manager:
+            raise ValueError(f"{self.agent_name}: db_manager required for research_queries")
+        if not hasattr(self, '_research_queries'):
+            from app.database.queries import ResearchQueries
+            self._research_queries = ResearchQueries(self.db_manager)
+        return self._research_queries
+
+    @property
+    def idea_queries(self):
+        """Lazy-load idea queries (requires db_manager)"""
+        if not self.db_manager:
+            raise ValueError(f"{self.agent_name}: db_manager required for idea_queries")
+        if not hasattr(self, '_idea_queries'):
+            from app.database.queries import IdeaQueries
+            self._idea_queries = IdeaQueries(self.db_manager)
+        return self._idea_queries
+
+    @property
+    def bundle_queries(self):
+        """Lazy-load bundle queries (requires db_manager)"""
+        if not self.db_manager:
+            raise ValueError(f"{self.agent_name}: db_manager required for bundle_queries")
+        if not hasattr(self, '_bundle_queries'):
+            from app.database.queries import BundleQueries
+            self._bundle_queries = BundleQueries(self.db_manager)
+        return self._bundle_queries
+
+    @property
+    def maker_queries(self):
+        """Lazy-load maker queries (requires db_manager)"""
+        if not self.db_manager:
+            raise ValueError(f"{self.agent_name}: db_manager required for maker_queries")
+        if not hasattr(self, '_maker_queries'):
+            from app.database.queries import MakerQueries
+            self._maker_queries = MakerQueries(self.db_manager)
+        return self._maker_queries
+
+    @property
+    def used_idea_queries(self):
+        """Lazy-load used idea queries (requires db_manager)"""
+        if not self.db_manager:
+            raise ValueError(f"{self.agent_name}: db_manager required for used_idea_queries")
+        if not hasattr(self, '_used_idea_queries'):
+            from app.database.queries import UsedIdeaQueries
+            self._used_idea_queries = UsedIdeaQueries(self.db_manager)
+        return self._used_idea_queries
+
+    @property
+    def created_bundle_queries(self):
+        """Lazy-load created bundle queries (requires db_manager)"""
+        if not self.db_manager:
+            raise ValueError(f"{self.agent_name}: db_manager required for created_bundle_queries")
+        if not hasattr(self, '_created_bundle_queries'):
+            from app.database.queries import CreatedBundleQueries
+            self._created_bundle_queries = CreatedBundleQueries(self.db_manager)
+        return self._created_bundle_queries
 
     def _load_instructions(self) -> str:
         """
@@ -108,7 +184,7 @@ class BaseAgent(ABC):
 
     def _load_output_schema(self) -> Dict[str, Any]:
         """
-        Load output schema from schemas/{output_schema_name}
+        Load output schema from schemas/{agent_name}.output.schema.json
 
         Returns:
             Dict[str, Any]: Parsed JSON schema
@@ -142,14 +218,9 @@ class BaseAgent(ABC):
         Returns:
             bool: True if validation passes, False otherwise
         """
-        schema_path = Path(__file__).parent / "schemas" / self.output_schema_name
-
         try:
-            with open(schema_path, "r", encoding="utf-8") as f:
-                schema = json.load(f)
-
-            # Validate using Draft 7 schema
-            jsonschema.validate(response, schema)
+            # Validate using the pre-loaded schema
+            jsonschema.validate(response, self.output_schema)
             self.logger.info(f"Response validation passed for {self.agent_name}")
             return True
 
@@ -158,17 +229,42 @@ class BaseAgent(ABC):
             self.logger.debug(f"Validation error details: {e}")
             return False
         except jsonschema.SchemaError as e:
-            self.logger.error(f"Invalid schema file: {e}")
-            return False
-        except FileNotFoundError:
-            self.logger.error(f"Schema file not found: {schema_path}")
-            return False
-        except json.JSONDecodeError as e:
-            self.logger.error(f"Malformed schema JSON: {e}")
+            self.logger.error(f"Invalid schema: {e}")
             return False
         except Exception as e:
             self.logger.error(f"Unexpected validation error: {e}")
             return False
+
+    def _strip_citations(self, data: Any) -> Any:
+        """
+        Recursively strip OpenAI citation markers from data structures.
+
+        Citation markers follow the pattern: \ue200cite\ue202<refs>\ue201
+        where <refs> can be multiple citation references separated by \ue202
+
+        Args:
+            data: Any data structure (dict, list, str, or primitive)
+
+        Returns:
+            Same data structure with citations stripped from all string values
+        """
+        if isinstance(data, dict):
+            # Recursively process dictionary values
+            return {key: self._strip_citations(value) for key, value in data.items()}
+
+        elif isinstance(data, list):
+            # Recursively process list items
+            return [self._strip_citations(item) for item in data]
+
+        elif isinstance(data, str):
+            # Strip citation markers from string and clean trailing whitespace
+            # Pattern: \ue200cite\ue202<citation-refs>\ue201
+            cleaned = re.sub(r'\ue200cite\ue202[^\ue201]*\ue201', '', data)
+            return cleaned.strip()
+
+        else:
+            # Return primitives (int, float, bool, None) unchanged
+            return data
 
     def _handle_stream(
         self,
@@ -189,10 +285,11 @@ class BaseAgent(ABC):
             Dict[str, Any]: Parsed JSON response from final output
 
         Raises:
-            ValueError: If no output received from stream
+            ValueError: If no output received, request failed, or incomplete
             json.JSONDecodeError: If output is not valid JSON
         """
         final_output = None
+        failure_reason = None
 
         for event in stream:
             # Get event type safely without hard-coding
@@ -202,13 +299,22 @@ class BaseAgent(ABC):
             if event_type in ['response.created', 'response.in_progress', 'response.completed', 'response.failed', 'response.incomplete']:
                 emit({
                     "event": "log",
-                    "step": self.agent_name,
+                    "step": self.step_name,
                     "message": f"Processing: {event_type}"
                 })
 
+            # Handle failure states explicitly
+            if event_type == 'response.failed':
+                error_msg = getattr(getattr(event, 'response', None), 'error', {})
+                failure_reason = f"OpenAI request failed: {error_msg.get('message', 'Unknown error')}"
+                emit({"event": "error", "step": self.step_name, "message": failure_reason})
+
+            elif event_type == 'response.incomplete':
+                failure_reason = "OpenAI request incomplete: The model did not finish processing the request"
+                emit({"event": "error", "step": self.step_name, "message": failure_reason})
+
             # Extract output from response.completed event
-            if event_type == 'response.completed':
-            
+            elif event_type == 'response.completed':
                 # Extract output using correct path
                 try:
                     if hasattr(event, 'response') and hasattr(event.response, 'output_text'):
@@ -216,20 +322,34 @@ class BaseAgent(ABC):
                         self.logger.info(f"Successfully extracted output from stream")
                 except Exception as e:
                     self.logger.error(f"Error extracting output: {e}")
-                    emit({"event": "error", "step": self.agent_name, "message": f"Extraction error: {e}"})
-                
+                    emit({"event": "error", "step": self.step_name, "message": f"Extraction error: {e}"})
+
+        # Check for failures
+        if failure_reason:
+            self.logger.error(failure_reason)
+            raise ValueError(failure_reason)
+
         # Validate we got output
         if not final_output:
-            self.logger.error("No output received from stream")
-            raise ValueError("No output received from stream")
+            error_msg = "No output received from OpenAI stream"
+            self.logger.error(error_msg)
+            emit({"event": "error", "step": self.step_name, "message": error_msg})
+            raise ValueError(error_msg)
 
         # Parse JSON response
         try:
             result = json.loads(final_output)
             self.logger.info("Successfully parsed stream output")
+
+            # Strip OpenAI citation markers from all string values
+            result = self._strip_citations(result)
+            self.logger.debug("Stripped citation markers from response")
+
             return result
         except json.JSONDecodeError as e:
-            self.logger.error(f"Failed to parse stream output as JSON: {e}")
+            error_msg = f"Failed to parse stream output as JSON: {e}"
+            self.logger.error(error_msg)
+            emit({"event": "error", "step": self.step_name, "message": error_msg})
             raise
 
     @abstractmethod
@@ -249,3 +369,25 @@ class BaseAgent(ABC):
         raise NotImplementedError(
             f"{self.__class__.__name__} must implement execute() method"
         )
+
+    def _save_result(self, result: Dict[str, Any]) -> bool:
+        """
+        Save agent result to database (optional, only if db_manager provided).
+
+        Subclasses can override this to implement their own persistence logic.
+        By default, this is a no-op if db_manager is not provided.
+
+        Args:
+            result: The result dictionary from execute()
+
+        Returns:
+            bool: True if saved successfully, False otherwise
+        """
+        if not self.db_manager:
+            self.logger.debug(f"{self.agent_name}: No db_manager, skipping _save_result")
+            return False
+
+        self.logger.warning(
+            f"{self.agent_name}: _save_result() not implemented, result not saved to DB"
+        )
+        return False

@@ -214,6 +214,117 @@ class IPCServer:
             else:
                 self.emit_error(None, "Failed to reset output folder")
 
+        elif cmd == "get_ideas":
+            try:
+                logger.info("Handling get_ideas command")
+
+                # Ensure orchestrator is initialized
+                self._set_orchestrator(False)
+                logger.debug(f"Orchestrator initialized: {type(self.orchestrator).__name__}")
+
+                params = command.get("params", {})
+                limit = params.get("limit", 100)
+
+                from app.database.queries import IdeaQueries
+                idea_queries = IdeaQueries(self.orchestrator.db_manager)
+                logger.debug("IdeaQueries created, fetching ideas...")
+
+                ideas = idea_queries.get_all(limit=limit)
+                logger.info(f"Retrieved {len(ideas)} ideas from database")
+
+                # Serialize ideas to dicts
+                ideas_data = [idea.model_dump() for idea in ideas]
+                logger.debug(f"Serialized {len(ideas_data)} ideas")
+
+                self.emit_event({
+                    "event": "ideas_list",
+                    "ideas": ideas_data,
+                    "total": len(ideas_data)
+                })
+                logger.info(f"Emitted ideas_list event with {len(ideas_data)} ideas")
+
+            except Exception as e:
+                logger.error(f"Failed to get ideas: {e}", exc_info=True)
+                self.emit_error(None, f"Failed to retrieve ideas: {str(e)}")
+
+        elif cmd == "get_bundles":
+            try:
+                logger.info("Handling get_bundles command")
+
+                # Ensure orchestrator is initialized
+                self._set_orchestrator(False)
+
+                params = command.get("params", {})
+                limit = params.get("limit", 100)
+
+                from app.database.queries import BundleQueries
+                bundle_queries = BundleQueries(self.orchestrator.db_manager)
+                bundles = bundle_queries.get_all(limit=limit)
+                logger.info(f"Retrieved {len(bundles)} bundles from database")
+
+                self.emit_event({
+                    "event": "bundles_list",
+                    "bundles": [bundle.model_dump() for bundle in bundles],
+                    "total": len(bundles)
+                })
+                logger.info(f"Emitted bundles_list event with {len(bundles)} bundles")
+
+            except Exception as e:
+                logger.error(f"Failed to get bundles: {e}", exc_info=True)
+                self.emit_error(None, f"Failed to retrieve bundles: {str(e)}")
+
+        elif cmd == "get_library_stats":
+            try:
+                logger.info("Handling get_library_stats command")
+
+                # Ensure orchestrator is initialized
+                self._set_orchestrator(False)
+
+                from app.database.queries import IdeaQueries, BundleQueries
+                idea_queries = IdeaQueries(self.orchestrator.db_manager)
+                bundle_queries = BundleQueries(self.orchestrator.db_manager)
+
+                ideas = idea_queries.get_all(limit=1000)
+                bundles = bundle_queries.get_all(limit=1000)
+                logger.info(f"Retrieved stats: {len(ideas)} ideas, {len(bundles)} bundles")
+
+                self.emit_event({
+                    "event": "library_stats",
+                    "stats": {
+                        "ideas_count": len(ideas),
+                        "bundles_count": len(bundles)
+                    }
+                })
+                logger.info(f"Emitted library_stats event")
+
+            except Exception as e:
+                logger.error(f"Failed to get library stats: {e}", exc_info=True)
+                self.emit_error(None, f"Failed to retrieve library stats: {str(e)}")
+
+        elif cmd == "reset_database":
+            from app.settings import settings
+            import os
+
+            try:
+                # Close any existing connections
+                if self.orchestrator and hasattr(self.orchestrator, 'db_manager'):
+                    self.orchestrator.db_manager.close()
+                    self.orchestrator = None
+
+                # Delete database file
+                if settings.db_path.exists():
+                    os.remove(settings.db_path)
+                    self.emit_event({
+                        "event": "database_reset",
+                        "success": True,
+                        "message": "Database reset successfully"
+                    })
+                else:
+                    self.emit_error(None, "Database file not found")
+
+            except Exception as e:
+                self.emit_error(None, f"Failed to reset database: {e}")
+
         else:
             self.emit_error(None, f"Unknown command: {cmd}")
     

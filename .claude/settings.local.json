@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import sqlite3, json; conn = sqlite3.connect(r''C:\\Users\\Brody\\AppData\\Local\\AssetForge\\history.db''); cursor = conn.cursor(); cursor.execute(''SELECT idea_id, priority, roi_estimate, idea_json FROM ideas ORDER BY roi_estimate DESC''); ideas = cursor.fetchall(); data = [{''priority'': i[1], ''roi'': i[2], ''demand_signals'': json.loads(i[3]).get(''demand_signals'', [])} for i in ideas]; import json; f = open(''C:/temp/ideas_analysis.json'', ''w'', encoding=''utf-8''); json.dump(data, f, indent=2, ensure_ascii=False); f.close(); print(''Written to C:/temp/ideas_analysis.json''); conn.close()\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -1,8 +1,8 @@
 import React, { useState } from "react";
-import { Zap, History } from "lucide-react";
+import { Zap, History, Database } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type TabId = "one-click" | "history";
+type TabId = "one-click" | "library" | "history";
 
 interface Tab {
   id: TabId;
@@ -12,6 +12,7 @@ interface Tab {
 
 const tabs: Tab[] = [
   { id: "one-click", label: "One-Click", icon: <Zap className="h-4 w-4" /> },
+  { id: "library", label: "Library", icon: <Database className="h-4 w-4" /> },
   { id: "history", label: "History", icon: <History className="h-4 w-4" /> },
 ];
 
