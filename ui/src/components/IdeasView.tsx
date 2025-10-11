@@ -19,7 +19,11 @@ interface Idea {
 type SortOption = "roi_desc" | "roi_asc" | "date_desc" | "date_asc" | "priority";
 type FilterOption = "all" | "A" | "B" | "C";
 
-export function IdeasView() {
+interface IdeasViewProps {
+  onBuildBundle?: (ideaId: string) => void;
+}
+
+export function IdeasView({ onBuildBundle }: IdeasViewProps = {}) {
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<SortOption>("roi_desc");
@@ -136,7 +140,7 @@ export function IdeasView() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {sortedIdeas.map((idea) => (
-            <IdeaCard key={idea.idea_id} idea={idea} />
+            <IdeaCard key={idea.idea_id} idea={idea} onBuildBundle={onBuildBundle} />
           ))}
         </div>
       )}

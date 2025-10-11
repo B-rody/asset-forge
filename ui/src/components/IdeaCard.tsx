@@ -15,9 +15,10 @@ interface IdeaCardProps {
     roi_estimate: number;
     idea_json: string;
   };
+  onBuildBundle?: (ideaId: string) => void;
 }
 
-export function IdeaCard({ idea }: IdeaCardProps) {
+export function IdeaCard({ idea, onBuildBundle }: IdeaCardProps) {
   const [showDetails, setShowDetails] = useState(false);
 
   // Priority badge colors
@@ -83,6 +84,7 @@ export function IdeaCard({ idea }: IdeaCardProps) {
         idea={idea}
         open={showDetails}
         onOpenChange={setShowDetails}
+        onBuildBundle={onBuildBundle}
       />
     </>
   );

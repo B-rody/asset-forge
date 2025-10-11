@@ -59,6 +59,19 @@ class IPCServer:
 
             await self.orchestrator.run_pipeline(mode, params, self.emit_event)
 
+        elif cmd == "build_from_idea":
+            params = command.get("params", {})
+            idea_id = params.get("idea_id")
+
+            if not idea_id:
+                self.emit_error(None, "No idea_id provided")
+                return
+
+            # Use real orchestrator for building from idea
+            self._set_orchestrator(False)
+
+            await self.orchestrator.run_from_idea(idea_id, self.emit_event)
+
         elif cmd == "re_run_step":
             params = command.get("params", {})
             bundle_id = params.get("bundle_id")

@@ -1,0 +1,535 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://example.com/schemas/planner.v1_0.schema.json",
+  "title": "Planner Output (v1.0)",
+  "description": "Complete bundle plan output from the Planner agent — serves as the blueprint for the Maker agent to create digital product assets and as storage in the Bundle database.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "bundle_id",
+    "idea_id",
+    "generated_at",
+    "schema_version",
+    "niche",
+    "sub_niche",
+    "title",
+    "description",
+    "one_liner",
+    "value_prop",
+    "differentiation_angle",
+    "demand_signals",
+    "priority",
+    "roi_estimate",
+    "assets",
+    "target_persona",
+    "brand_voice",
+    "content_guidelines",
+    "pricing",
+    "marketplace_metadata",
+    "bundle_structure"
+  ],
+  "properties": {
+    "bundle_id": {
+      "type": "string",
+      "minLength": 10,
+      "description": "Unique identifier for this bundle (e.g., 'bundle-2025-10-11-glp1-tracker')."
+    },
+    "idea_id": {
+      "type": "string",
+      "minLength": 5,
+      "description": "Reference to the source idea from researcher that this bundle is based on."
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp when this bundle plan was generated."
+    },
+    "schema_version": {
+      "type": "string",
+      "pattern": "^planner\\.v\\d+\\.\\d+$",
+      "description": "Schema version identifier (e.g., 'planner.v1.0')."
+    },
+    "niche": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 100,
+      "description": "Primary market niche from researcher (e.g., 'Health & wellness tracking')."
+    },
+    "sub_niche": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 150,
+      "description": "Refined subcategory from researcher (e.g., 'GLP-1 weight-loss therapy support')."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 150,
+      "description": "Product bundle title for display and marketing."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 50,
+      "maxLength": 2000,
+      "description": "Comprehensive product bundle description explaining what's included and who it's for."
+    },
+    "one_liner": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 160,
+      "description": "Short marketing-friendly summary from researcher expressing what the bundle delivers."
+    },
+    "value_prop": {
+      "type": "string",
+      "minLength": 15,
+      "maxLength": 500,
+      "description": "Outcome-oriented value proposition from researcher — the transformation this bundle delivers."
+    },
+    "differentiation_angle": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 500,
+      "description": "Key positioning strategy from researcher — what makes this bundle unique vs competitors."
+    },
+    "demand_signals": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "items": {
+        "type": "string",
+        "minLength": 6
+      },
+      "description": "Observed demand indicators from researcher that validate market need."
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["A", "B", "C"],
+      "description": "Priority tier from researcher: A = high-value opportunity, B = medium, C = low."
+    },
+    "roi_estimate": {
+      "type": "number",
+      "minimum": 0,
+      "description": "ROI estimate from researcher based on reach, impact, confidence, and effort."
+    },
+    "assets": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 8,
+      "description": "Detailed specifications for each digital asset the Maker agent must create.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["asset_id", "type", "name", "description", "content_specs", "format"],
+        "properties": {
+          "asset_id": {
+            "type": "string",
+            "pattern": "^asset-[0-9]{3}$",
+            "description": "Unique asset identifier within this bundle (e.g., 'asset-001')."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "notion_template",
+              "ai_prompt_pack",
+              "workbook",
+              "interactive_pdf",
+              "course_resources",
+              "tracker",
+              "checklist",
+              "guide",
+              "worksheet",
+              "template",
+              "infographic",
+              "planner",
+              "journal"
+            ],
+            "description": "Category of digital asset."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 100,
+            "description": "User-facing name for this asset."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 500,
+            "description": "Detailed description of what this asset contains and how it's used."
+          },
+          "content_specs": {
+            "type": "object",
+            "description": "Detailed content specifications that tell the Maker exactly what to create.",
+            "required": ["sections", "features"],
+            "additionalProperties": false,
+            "properties": {
+              "sections": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 3
+                },
+                "description": "List of major sections or components (e.g., ['Daily Log', 'Weekly Summary', 'Goals'])."
+              },
+              "features": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 3
+                },
+                "description": "Key interactive or functional features (e.g., ['Dropdown menus', 'Progress bars', 'Fillable fields'])."
+              },
+              "page_count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "description": "Estimated number of pages or screens."
+              },
+              "additional_notes": {
+                "type": "string",
+                "maxLength": 500,
+                "description": "Any additional instructions or clarifications for the Maker."
+              }
+            }
+          },
+          "format": {
+            "type": "string",
+            "enum": ["PDF", "PNG", "JPG", "SVG", "DOCX", "XLSX", "TXT", "MD", "NOTION", "CSV", "HTML"],
+            "description": "Output file format for this asset."
+          },
+          "target_file_size_mb": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 50,
+            "description": "Target file size in megabytes (for optimization guidance)."
+          },
+          "includes_fillable_fields": {
+            "type": "boolean",
+            "description": "Whether this asset includes interactive/fillable fields."
+          },
+          "dependencies": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^asset-[0-9]{3}$"
+            },
+            "description": "Asset IDs that this asset references or depends on."
+          }
+        }
+      }
+    },
+    "target_persona": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "age_range",
+        "occupation",
+        "pain_points",
+        "goals",
+        "use_cases",
+        "technical_skill_level",
+        "buying_motivations"
+      ],
+      "description": "Detailed target audience profile for content creation and marketing.",
+      "properties": {
+        "age_range": {
+          "type": "string",
+          "minLength": 3,
+          "description": "Age demographic (e.g., '28-45')."
+        },
+        "occupation": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 100,
+          "description": "Primary occupation or role (e.g., 'Working professional', 'Small business owner')."
+        },
+        "pain_points": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 8,
+          "items": {
+            "type": "string",
+            "minLength": 10
+          },
+          "description": "Specific problems or frustrations this persona experiences."
+        },
+        "goals": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 8,
+          "items": {
+            "type": "string",
+            "minLength": 10
+          },
+          "description": "What this persona wants to achieve or accomplish."
+        },
+        "use_cases": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 8,
+          "items": {
+            "type": "string",
+            "minLength": 10
+          },
+          "description": "Specific scenarios or situations where they'll use this bundle."
+        },
+        "technical_skill_level": {
+          "type": "string",
+          "enum": ["beginner", "intermediate", "advanced"],
+          "description": "Technical proficiency with digital tools."
+        },
+        "buying_motivations": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 6,
+          "items": {
+            "type": "string",
+            "minLength": 10
+          },
+          "description": "Why this persona would purchase this bundle (e.g., 'Save time', 'Professional design')."
+        }
+      }
+    },
+    "brand_voice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tone", "style", "language_level"],
+      "description": "Brand voice and tone guidelines for all content creation.",
+      "properties": {
+        "tone": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 100,
+          "description": "Overall emotional tone (e.g., 'empathetic and encouraging', 'professional and authoritative')."
+        },
+        "style": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 100,
+          "description": "Writing style characteristics (e.g., 'conversational yet polished', 'direct and actionable')."
+        },
+        "language_level": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 50,
+          "description": "Target reading level (e.g., '8th grade', 'college level', 'general audience')."
+        },
+        "avoid_terms": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 2
+          },
+          "description": "Words or phrases to avoid (e.g., ['medical advice', 'guaranteed results', 'jargon'])."
+        }
+      }
+    },
+    "content_guidelines": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Technical and stylistic guidelines for asset creation.",
+      "properties": {
+        "formatting_rules": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 5
+          },
+          "description": "Formatting standards (e.g., ['Use sentence case for headings', 'Single space after periods'])."
+        },
+        "visual_style": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 300,
+          "description": "Visual design direction (e.g., 'Clean and minimal with soft colors, sans-serif fonts')."
+        },
+        "accessibility_requirements": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 5
+          },
+          "description": "Accessibility considerations (e.g., ['High contrast text', 'Screen reader compatible'])."
+        }
+      }
+    },
+    "pricing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategy", "recommended_price_usd", "price_rationale"],
+      "description": "Pricing strategy and justification based on research and positioning.",
+      "properties": {
+        "strategy": {
+          "type": "string",
+          "enum": ["competitive", "premium", "value", "penetration"],
+          "description": "Overall pricing approach relative to market."
+        },
+        "recommended_price_usd": {
+          "type": "number",
+          "minimum": 0.99,
+          "maximum": 500,
+          "description": "Recommended sale price in USD for primary marketplace."
+        },
+        "price_rationale": {
+          "type": "string",
+          "minLength": 20,
+          "maxLength": 500,
+          "description": "Explanation of pricing based on research, competition, and value delivered."
+        },
+        "observed_price_range": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["low", "high"],
+          "description": "Observed competitor pricing from researcher data.",
+          "properties": {
+            "low": {
+              "type": "number",
+              "minimum": 0
+            },
+            "high": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "marketplace_metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Complete marketplace listing metadata for each target platform.",
+      "properties": {
+        "etsy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["title", "description", "tags", "category", "price_usd", "seo_keywords"],
+          "description": "Etsy-specific listing metadata with platform constraints.",
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 140,
+              "description": "Etsy listing title (140 character limit)."
+            },
+            "description": {
+              "type": "string",
+              "minLength": 100,
+              "maxLength": 5000,
+              "description": "Full Etsy listing description with benefits, features, and usage instructions."
+            },
+            "tags": {
+              "type": "array",
+              "minItems": 5,
+              "maxItems": 13,
+              "items": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 20
+              },
+              "description": "Etsy search tags (13 maximum, 20 chars each)."
+            },
+            "category": {
+              "type": "string",
+              "minLength": 5,
+              "maxLength": 100,
+              "description": "Etsy category path (e.g., 'Templates > Health & Wellness')."
+            },
+            "price_usd": {
+              "type": "number",
+              "minimum": 0.20,
+              "description": "Etsy listing price in USD (minimum $0.20)."
+            },
+            "seo_keywords": {
+              "type": "array",
+              "minItems": 5,
+              "maxItems": 20,
+              "items": {
+                "type": "string",
+                "minLength": 2
+              },
+              "description": "Additional SEO keywords for discoverability."
+            }
+          }
+        },
+        "gumroad": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "description", "price_usd"],
+          "description": "Gumroad-specific listing metadata.",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 150,
+              "description": "Gumroad product name."
+            },
+            "description": {
+              "type": "string",
+              "minLength": 100,
+              "maxLength": 10000,
+              "description": "Full Gumroad product description (supports markdown)."
+            },
+            "price_usd": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Gumroad price in USD (can be $0 for pay-what-you-want)."
+            },
+            "short_url_slug": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]+$",
+              "minLength": 3,
+              "maxLength": 50,
+              "description": "URL-friendly slug for Gumroad product link."
+            }
+          }
+        }
+      }
+    },
+    "bundle_structure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root_folder_name", "include_readme", "folder_structure"],
+      "description": "File organization structure for the Packager agent to assemble.",
+      "properties": {
+        "root_folder_name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9-_]+$",
+          "minLength": 3,
+          "maxLength": 100,
+          "description": "Name of the root bundle folder (alphanumeric, hyphens, underscores only)."
+        },
+        "include_readme": {
+          "type": "boolean",
+          "description": "Whether to generate a README file explaining bundle contents."
+        },
+        "folder_structure": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "assets"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Relative folder path (e.g., '/templates', '/guides')."
+              },
+              "assets": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^asset-[0-9]{3}$"
+                },
+                "description": "Asset IDs to place in this folder."
+              }
+            }
+          },
+          "description": "Folder hierarchy and asset placement mapping."
+        }
+      }
+    }
+  }
+}

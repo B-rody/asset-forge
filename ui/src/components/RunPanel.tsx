@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Zap, FolderOpen, Target } from "lucide-react";
+import { Zap, FolderOpen, Target, Search } from "lucide-react";
 import { open } from "@tauri-apps/api/dialog";
 import { open as openPath } from "@tauri-apps/api/shell";
 import { ipcClient } from "@/lib/ipc";
@@ -12,10 +12,11 @@ type TabId = "one-click" | "history";
 interface RunPanelProps {
   activeTab: TabId;
   onRunStart: () => void;
+  onResearchOnly?: () => void;
   isRunning: boolean;
 }
 
-export function RunPanel({ activeTab, onRunStart, isRunning }: RunPanelProps) {
+export function RunPanel({ activeTab, onRunStart, onResearchOnly, isRunning }: RunPanelProps) {
   const [useFocusedMode, setUseFocusedMode] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [outputFolder, setOutputFolder] = useState("");
@@ -154,6 +155,45 @@ export function RunPanel({ activeTab, onRunStart, isRunning }: RunPanelProps) {
       await ipcClient.sendCommand({
         cmd: "run_pipeline",
         mode: "one_click",
+        params: { mockMode },
+      });
+    }
+  };
+
+  const handleResearchRun = async () => {
+    // If not in mock mode, check for API key first
+    if (!mockMode) {
+      try {
+        // Check if API key exists
+        const hasKey = await checkApiKey();
+        if (!hasKey) {
+          alert("Please add your OpenAI API key in Settings before running the pipeline.");
+          return;
+        }
+      } catch (error) {
+        console.error("Failed to check API key:", error);
+        alert("Failed to verify API key. Please check your settings.");
+        return;
+      }
+    }
+
+    onRunStart();
+
+    if (onResearchOnly) {
+      onResearchOnly();
+    }
+
+    // Send research-only command
+    if (useFocusedMode) {
+      await ipcClient.sendCommand({
+        cmd: "run_pipeline",
+        mode: "research_only_focused",
+        params: { keyword, mockMode },
+      });
+    } else {
+      await ipcClient.sendCommand({
+        cmd: "run_pipeline",
+        mode: "research_only",
         params: { mockMode },
       });
     }
@@ -348,22 +388,36 @@ export function RunPanel({ activeTab, onRunStart, isRunning }: RunPanelProps) {
             </div>
           </div>
 
-          {/* Contextual Hint */}
-          <div className="text-center">
-            <p className="text-xs text-slate-500 dark:text-slate-500 italic">
-              Your bundle includes research, planning, generation, and packaging — all automated.
-            </p>
-          </div>
+          {/* Action Buttons */}
+          <div className="space-y-3">
+            {/* Research Ideas Button */}
+            <button
+              type="button"
+              onClick={isRunning ? undefined : handleResearchRun}
+              disabled={isRunning}
+              className={cn(
+                "w-full flex items-center gap-3 p-4 rounded-lg border-2 transition-all",
+                "hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30",
+                "disabled:opacity-50 disabled:cursor-not-allowed",
+                isRunning ? "border-border bg-muted" : "border-border bg-card"
+              )}
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                <Search className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div className="flex-1 text-left">
+                <div className="font-semibold">Research Ideas</div>
+                <div className="text-xs text-muted-foreground">Find opportunities, review & pick</div>
+              </div>
+            </button>
 
-          {/* Generate Button */}
-          <div className="relative">
-            <Button
+            {/* Generate Bundle (Auto) Button */}
+            <button
               type="button"
               onClick={isRunning ? undefined : handleRun}
-              aria-busy={isRunning}
-              aria-disabled={isRunning}
+              disabled={isRunning}
               className={cn(
-                "w-full relative overflow-hidden",
+                "w-full relative overflow-hidden p-4 rounded-lg",
                 "transition-all duration-[250ms] ease-in-out",
                 "focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2",
                 "dark:focus-visible:ring-offset-slate-900",
@@ -372,9 +426,8 @@ export function RunPanel({ activeTab, onRunStart, isRunning }: RunPanelProps) {
                   "bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500",
                   "hover:brightness-110",
                   "hover:shadow-[0_0_12px_#2563eb80]",
-                  "hover:animate-gradient-shift"
                 ],
-                // Active/Generating state - Amplified hover effects
+                // Active/Generating state
                 isRunning && [
                   "bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500",
                   "animate-gradient-shift",
@@ -385,30 +438,27 @@ export function RunPanel({ activeTab, onRunStart, isRunning }: RunPanelProps) {
                   "cursor-not-allowed"
                 ]
               )}
-              size="lg"
             >
               {/* Pulsing inner glow when generating */}
               {isRunning && (
                 <span className="absolute inset-0 bg-[radial-gradient(circle,_rgba(59,130,246,0.5)_0%,_transparent_70%)] animate-pulse rounded-lg" />
               )}
 
-              <span className={cn(
-                "relative flex items-center justify-center",
+              <div className={cn(
+                "relative flex items-center gap-3 text-white",
                 isRunning && "text-white"
               )}>
-                {isRunning ? (
-                  <>
-                    <Zap className="mr-2 h-4 w-4" />
-                    Generating…
-                  </>
-                ) : (
-                  <>
-                    <Zap className="mr-2 h-4 w-4" />
-                    Generate Bundle
-                  </>
-                )}
-              </span>
-            </Button>
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20">
+                  <Zap className="h-5 w-5" />
+                </div>
+                <div className="flex-1 text-left">
+                  <div className="font-semibold">
+                    {isRunning ? "Generating…" : "Generate Bundle (Auto)"}
+                  </div>
+                  <div className="text-xs opacity-90">Full pipeline, AI picks best idea</div>
+                </div>
+              </div>
+            </button>
           </div>
         </div>
       )}

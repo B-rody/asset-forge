@@ -1,5 +1,5 @@
 import React from "react";
-import { X, TrendingUp, Target, AlertCircle } from "lucide-react";
+import { X, TrendingUp, Target, AlertCircle, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface IdeaDetailsDialogProps {
@@ -16,10 +16,18 @@ interface IdeaDetailsDialogProps {
   };
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onBuildBundle?: (ideaId: string) => void;
 }
 
-export function IdeaDetailsDialog({ idea, open, onOpenChange }: IdeaDetailsDialogProps) {
+export function IdeaDetailsDialog({ idea, open, onOpenChange, onBuildBundle }: IdeaDetailsDialogProps) {
   if (!open) return null;
+
+  const handleBuildBundle = () => {
+    if (onBuildBundle) {
+      onBuildBundle(idea.idea_id);
+      onOpenChange(false); // Close dialog after starting build
+    }
+  };
 
   // Parse idea JSON
   let ideaData: any = {};
@@ -173,13 +181,25 @@ export function IdeaDetailsDialog({ idea, open, onOpenChange }: IdeaDetailsDialo
         </div>
 
         {/* Footer */}
-        <div className="border-t border-border p-4 flex justify-end">
+        <div className="border-t border-border p-4 flex justify-between items-center">
           <button
             onClick={() => onOpenChange(false)}
-            className="px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+            className="px-4 py-2 text-sm font-medium rounded-md border border-border hover:bg-accent transition-colors"
           >
             Close
           </button>
+          {onBuildBundle && (
+            <button
+              onClick={handleBuildBundle}
+              className="px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors flex items-center gap-2"
+            >
+              <Package className="h-4 w-4" />
+              <div className="flex flex-col items-start">
+                <span>Create Bundle Plan</span>
+                <span className="text-xs font-normal opacity-90">Design bundle structure & pricing</span>
+              </div>
+            </button>
+          )}
         </div>
       </div>
     </div>

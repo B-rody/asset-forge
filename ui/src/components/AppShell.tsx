@@ -6,9 +6,10 @@ import { ResultPanel } from "./ResultPanel";
 import { StepChips } from "./StepChips";
 import { LogStream } from "./LogStream";
 import { LibraryPanel } from "./LibraryPanel";
+import { IdeasView } from "./IdeasView";
 import { ipcClient, IPCEvent } from "@/lib/ipc";
 
-type TabId = "one-click" | "library" | "history";
+type TabId = "one-click" | "ideas" | "library" | "history";
 
 interface StepChip {
   name: string;
@@ -94,13 +95,16 @@ export function AppShell() {
         }
       } else if (event.event === "done") {
         const success = event.success !== false; // Default to true if not specified
+        const researchOnly = event.research_only === true;
 
         setLogs((prev) => [
           ...prev,
           {
             timestamp: now,
             message: success
-              ? "Pipeline completed successfully!"
+              ? researchOnly
+                ? "Research completed! Navigate to Ideas tab to review results."
+                : "Pipeline completed successfully!"
               : `Pipeline failed: ${event.error || "Unknown error"}`,
             type: success ? "success" : "error",
           },
@@ -118,7 +122,14 @@ export function AppShell() {
         // Clear pipeline start time
         setPipelineStartTime(null);
 
-        if (success) {
+        // If research-only mode completed successfully, navigate to Ideas tab
+        if (success && researchOnly) {
+          setTimeout(() => {
+            setActiveTab("ideas");
+          }, 1500); // Brief delay to let user see success message
+        }
+
+        if (success && !researchOnly) {
           setResult({
             bundle_id: event.result?.bundle_id || "unknown",
             output_path: event.result?.output_path || "unknown",
@@ -127,7 +138,7 @@ export function AppShell() {
             runtime: "2m 15s",
             file_count: 3,
           });
-        } else {
+        } else if (!success) {
           setResult({
             bundle_id: "failed",
             output_path: "N/A",
@@ -178,6 +189,26 @@ export function AppShell() {
     setPipelineStartTime(null);
   };
 
+  const handleCreatePlanFromIdea = (ideaId: string) => {
+    // Reset state for new pipeline run
+    handleRunStart();
+
+    // Switch to Generate tab to show pipeline progress
+    setActiveTab("one-click");
+
+    // Send IPC command to create bundle plan from idea
+    ipcClient.sendCommand({
+      cmd: "build_from_idea",
+      params: { idea_id: ideaId }
+    });
+  };
+
+  const handleResearchOnly = () => {
+    // This will be called by RunPanel when starting research-only mode
+    // We'll navigate to Ideas tab when research completes
+    // (handled in IPC event listener for "done" event with research_only mode)
+  };
+
   return (
     <div className="flex h-screen flex-col">
       <HeaderBar />
@@ -185,7 +216,17 @@ export function AppShell() {
         <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
         <main className="flex-1 overflow-y-auto p-6">
           <div className="mx-auto max-w-5xl xl:max-w-6xl 2xl:max-w-7xl space-y-6">
-            {activeTab === "library" ? (
+            {activeTab === "ideas" ? (
+              <>
+                <div className="mb-6">
+                  <h1 className="text-2xl font-bold mb-2">Ideas Library</h1>
+                  <p className="text-muted-foreground">
+                    Browse and build from your research ideas
+                  </p>
+                </div>
+                <IdeasView onBuildBundle={handleCreatePlanFromIdea} />
+              </>
+            ) : activeTab === "library" ? (
               <LibraryPanel />
             ) : activeTab === "history" ? (
               <div className="rounded-xl border border-border bg-gradient-to-b from-white to-slate-50 dark:from-slate-900 dark:to-slate-950 p-6 shadow-sm">
@@ -196,7 +237,12 @@ export function AppShell() {
               </div>
             ) : (
               <>
-                <RunPanel activeTab={activeTab} onRunStart={handleRunStart} isRunning={isPipelineRunning} />
+                <RunPanel
+                  activeTab={activeTab}
+                  onRunStart={handleRunStart}
+                  onResearchOnly={handleResearchOnly}
+                  isRunning={isPipelineRunning}
+                />
 
                 <div className="rounded-lg border border-border bg-card p-6">
                   <h2 className="mb-4 text-lg font-semibold">Pipeline Status</h2>

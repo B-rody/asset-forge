@@ -1,0 +1,33 @@
+{
+  "mode": "single_idea",
+  "selected_idea_id": "",
+  "output_schema_version": "planner.v1.0",
+
+  "bundle_preferences": {
+    "asset_count_range": {
+      "min": 3,
+      "max": 5
+    },
+    "complexity": "moderate",
+    "include_bonus_assets": false
+  },
+
+  "marketplace_targets": ["etsy", "gumroad"],
+
+  "pricing_strategy": {
+    "positioning": "competitive",
+    "allow_premium": true
+  },
+
+  "constraints": {
+    "max_file_size_mb": 50,
+    "avoid_formats": [],
+    "max_bundle_assets": 5
+  },
+
+  "emit": {
+    "json_only": true,
+    "no_markdown": true,
+    "strict_required_fields": true
+  }
+}
