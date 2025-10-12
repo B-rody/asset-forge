@@ -191,12 +191,12 @@ export function IdeaDetailsDialog({ idea, open, onOpenChange, onBuildBundle }: I
           {onBuildBundle && (
             <button
               onClick={handleBuildBundle}
-              className="px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors flex items-center gap-2"
+              className="px-4 py-2 text-sm font-medium rounded-md bg-primary text-white hover:bg-primary/80 transition-all hover:shadow-md flex items-center gap-2"
             >
               <Package className="h-4 w-4" />
               <div className="flex flex-col items-start">
                 <span>Create Bundle Plan</span>
-                <span className="text-xs font-normal opacity-90">Design bundle structure & pricing</span>
+                <span className="text-xs font-normal text-white/90">Design bundle structure & pricing</span>
               </div>
             </button>
           )}

@@ -119,7 +119,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["asset_id", "type", "name", "description", "content_specs", "format"],
+        "required": ["asset_id", "type", "name", "description", "content_specs", "format", "target_file_size_mb", "includes_fillable_fields", "dependencies"],
         "properties": {
           "asset_id": {
             "type": "string",
@@ -160,7 +160,7 @@
           "content_specs": {
             "type": "object",
             "description": "Detailed content specifications that tell the Maker exactly what to create.",
-            "required": ["sections", "features"],
+            "required": ["sections", "features", "page_count", "additional_notes"],
             "additionalProperties": false,
             "properties": {
               "sections": {

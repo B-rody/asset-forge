@@ -182,11 +182,11 @@ export function LogStream({ logs, isProcessing = false, startTime = null }: LogS
             {/* Processing indicator */}
             {isProcessing && (
               <div className="flex gap-2 mt-3 pt-3 border-t border-border/50">
+                <span className="text-muted-foreground font-normal">
+                  ({elapsedTime})
+                </span>
                 <span className="text-blue-600 dark:text-blue-400 font-medium">
-                  Processing<span className="animate-dots">...</span>
-                  <span className="ml-2 text-muted-foreground font-normal">
-                    ({elapsedTime})
-                  </span>
+                  Processing<span className="animate-dots"></span>
                 </span>
               </div>
             )}

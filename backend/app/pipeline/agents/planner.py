@@ -96,7 +96,6 @@ class PlannerAgent(BaseAgent):
 
         except Exception as e:
             self.logger.error(f"Execution failed: {e}")
-            emit({"event": "error", "step": self.step_name, "message": str(e)})
             raise
 
     def _load_idea_data(

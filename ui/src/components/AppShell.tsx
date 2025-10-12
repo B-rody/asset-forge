@@ -35,6 +35,7 @@ export function AppShell() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [result, setResult] = useState<any>(null);
   const [pipelineStartTime, setPipelineStartTime] = useState<number | null>(null);
+  const [runningMode, setRunningMode] = useState<"research" | "auto" | "plan" | null>(null);
 
   // Determine if pipeline is running
   const isPipelineRunning = steps.some((s) => s.status === "running");
@@ -96,6 +97,7 @@ export function AppShell() {
       } else if (event.event === "done") {
         const success = event.success !== false; // Default to true if not specified
         const researchOnly = event.research_only === true;
+        const wasPlanMode = runningMode === "plan"; // Capture before clearing
 
         setLogs((prev) => [
           ...prev,
@@ -103,7 +105,9 @@ export function AppShell() {
             timestamp: now,
             message: success
               ? researchOnly
-                ? "Research completed! Navigate to Ideas tab to review results."
+                ? "Research completed! Navigating to Ideas tab..."
+                : wasPlanMode
+                ? "Bundle plan created successfully! Navigating to Library..."
                 : "Pipeline completed successfully!"
               : `Pipeline failed: ${event.error || "Unknown error"}`,
             type: success ? "success" : "error",
@@ -119,8 +123,9 @@ export function AppShell() {
           )
         );
 
-        // Clear pipeline start time
+        // Clear pipeline start time and running mode
         setPipelineStartTime(null);
+        setRunningMode(null);
 
         // If research-only mode completed successfully, navigate to Ideas tab
         if (success && researchOnly) {
@@ -129,7 +134,14 @@ export function AppShell() {
           }, 1500); // Brief delay to let user see success message
         }
 
-        if (success && !researchOnly) {
+        // If plan-only mode completed successfully, navigate to Library tab
+        if (success && wasPlanMode) {
+          setTimeout(() => {
+            setActiveTab("library");
+          }, 1500); // Brief delay to let user see success message
+        }
+
+        if (success && !researchOnly && !wasPlanMode) {
           setResult({
             bundle_id: event.result?.bundle_id || "unknown",
             output_path: event.result?.output_path || "unknown",
@@ -167,22 +179,25 @@ export function AppShell() {
           );
         }
 
-        // Clear pipeline start time on error
+        // Clear pipeline start time and running mode on error
         setPipelineStartTime(null);
+        setRunningMode(null);
       }
     });
 
     return unsubscribe;
   }, []);
 
-  const handleRunStart = () => {
+  const handleRunStart = (stepsToShow?: StepChip[]) => {
     // Reset state
-    setSteps([
-      { name: "Researcher", status: "pending" },
-      { name: "Planner", status: "pending" },
-      { name: "Maker", status: "pending" },
-      { name: "Packager", status: "pending" },
-    ]);
+    const defaultSteps = [
+      { name: "Researcher", status: "pending" as const },
+      { name: "Planner", status: "pending" as const },
+      { name: "Maker", status: "pending" as const },
+      { name: "Packager", status: "pending" as const },
+    ];
+
+    setSteps(stepsToShow || defaultSteps);
     setStepProgress({});
     setLogs([]);
     setResult(null);
@@ -190,8 +205,11 @@ export function AppShell() {
   };
 
   const handleCreatePlanFromIdea = (ideaId: string) => {
-    // Reset state for new pipeline run
-    handleRunStart();
+    // Reset state for new pipeline run - only show Planner step
+    handleRunStart([
+      { name: "Planner", status: "pending" },
+    ]);
+    setRunningMode("plan");
 
     // Switch to Generate tab to show pipeline progress
     setActiveTab("one-click");
@@ -204,9 +222,17 @@ export function AppShell() {
   };
 
   const handleResearchOnly = () => {
-    // This will be called by RunPanel when starting research-only mode
-    // We'll navigate to Ideas tab when research completes
-    // (handled in IPC event listener for "done" event with research_only mode)
+    // Reset state for research-only mode - only show Researcher step
+    handleRunStart([
+      { name: "Researcher", status: "pending" },
+    ]);
+    setRunningMode("research");
+  };
+
+  const handleAutoGenerate = () => {
+    // Reset state for full pipeline
+    handleRunStart();
+    setRunningMode("auto");
   };
 
   return (
@@ -239,9 +265,10 @@ export function AppShell() {
               <>
                 <RunPanel
                   activeTab={activeTab}
-                  onRunStart={handleRunStart}
                   onResearchOnly={handleResearchOnly}
+                  onAutoGenerate={handleAutoGenerate}
                   isRunning={isPipelineRunning}
+                  runningMode={runningMode}
                 />
 
                 <div className="rounded-lg border border-border bg-card p-6">

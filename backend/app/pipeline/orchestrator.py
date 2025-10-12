@@ -101,6 +101,9 @@ class PipelineOrchestrator:
         except Exception as e:
             logger.error(f"Pipeline failed: {e}", exc_info=True)
 
+            # Emit error event with step name for log display
+            emit({"event": "error", "step": "Researcher", "message": str(e)})
+
             # Emit done event with failure status (don't re-raise)
             emit({
                 "event": "done",
@@ -154,6 +157,9 @@ class PipelineOrchestrator:
 
         except Exception as e:
             logger.error(f"Pipeline failed: {e}", exc_info=True)
+
+            # Emit error event with step name for log display
+            emit({"event": "error", "step": "Planner", "message": str(e)})
 
             # Emit done event with failure status (don't re-raise)
             emit({

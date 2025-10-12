@@ -11,12 +11,13 @@ type TabId = "one-click" | "history";
 
 interface RunPanelProps {
   activeTab: TabId;
-  onRunStart: () => void;
   onResearchOnly?: () => void;
+  onAutoGenerate?: () => void;
   isRunning: boolean;
+  runningMode?: "research" | "auto" | "plan" | null;
 }
 
-export function RunPanel({ activeTab, onRunStart, onResearchOnly, isRunning }: RunPanelProps) {
+export function RunPanel({ activeTab, onResearchOnly, onAutoGenerate, isRunning, runningMode }: RunPanelProps) {
   const [useFocusedMode, setUseFocusedMode] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [outputFolder, setOutputFolder] = useState("");
@@ -143,7 +144,9 @@ export function RunPanel({ activeTab, onRunStart, onResearchOnly, isRunning }: R
       }
     }
 
-    onRunStart();
+    if (onAutoGenerate) {
+      onAutoGenerate();
+    }
 
     if (useFocusedMode) {
       await ipcClient.sendCommand({
@@ -177,8 +180,6 @@ export function RunPanel({ activeTab, onRunStart, onResearchOnly, isRunning }: R
       }
     }
 
-    onRunStart();
-
     if (onResearchOnly) {
       onResearchOnly();
     }
@@ -201,26 +202,37 @@ export function RunPanel({ activeTab, onRunStart, onResearchOnly, isRunning }: R
 
   const checkApiKey = async (): Promise<boolean> => {
     return new Promise((resolve) => {
+      let resolved = false;
+
       // Subscribe to API key status event
       const unsubscribe = ipcClient.subscribe((event) => {
         if (event.event === "api_key_status") {
-          unsubscribe();
-          resolve(event.has_key === true);
+          if (!resolved) {
+            resolved = true;
+            unsubscribe();
+            console.log("API key check result:", event.has_key);
+            resolve(event.has_key === true);
+          }
         }
       });
 
       // Send command to check
+      console.log("Checking API key...");
       ipcClient.sendCommand({ cmd: "get_api_key" });
 
-      // Timeout after 2 seconds
+      // Timeout after 5 seconds (increased from 2)
       setTimeout(() => {
-        unsubscribe();
-        resolve(false);
-      }, 2000);
+        if (!resolved) {
+          resolved = true;
+          unsubscribe();
+          console.warn("API key check timed out");
+          resolve(false);
+        }
+      }, 5000);
     });
   };
 
-  // Keyboard shortcut listener (Ctrl+Enter or Cmd+Enter)
+  // Keyboard shortcut listener (Ctrl+Enter or Cmd+Enter) - triggers auto-generate
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
@@ -233,7 +245,7 @@ export function RunPanel({ activeTab, onRunStart, onResearchOnly, isRunning }: R
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isRunning, useFocusedMode, keyword]);
+  }, [isRunning, useFocusedMode, keyword, runningMode]);
 
   return (
     <div className="rounded-xl border border-border bg-gradient-to-b from-white to-slate-50 dark:from-slate-900 dark:to-slate-950 p-6 shadow-sm hover:shadow-md transition-shadow duration-200 border-l-4 border-l-primary">
@@ -394,19 +406,22 @@ export function RunPanel({ activeTab, onRunStart, onResearchOnly, isRunning }: R
             <button
               type="button"
               onClick={isRunning ? undefined : handleResearchRun}
-              disabled={isRunning}
+              disabled={isRunning && runningMode !== "research"}
               className={cn(
                 "w-full flex items-center gap-3 p-4 rounded-lg border-2 transition-all",
-                "hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30",
-                "disabled:opacity-50 disabled:cursor-not-allowed",
-                isRunning ? "border-border bg-muted" : "border-border bg-card"
+                runningMode === "research"
+                  ? "border-blue-400 bg-blue-50 dark:bg-blue-950/30 animate-pulse pointer-events-none"
+                  : "border-border bg-card hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30",
+                "disabled:opacity-50 disabled:cursor-not-allowed"
               )}
             >
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30">
                 <Search className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               </div>
               <div className="flex-1 text-left">
-                <div className="font-semibold">Research Ideas</div>
+                <div className="font-semibold">
+                  {runningMode === "research" ? "Researching…" : "Research Ideas"}
+                </div>
                 <div className="text-xs text-muted-foreground">Find opportunities, review & pick</div>
               </div>
             </button>
@@ -415,45 +430,42 @@ export function RunPanel({ activeTab, onRunStart, onResearchOnly, isRunning }: R
             <button
               type="button"
               onClick={isRunning ? undefined : handleRun}
-              disabled={isRunning}
+              disabled={isRunning && runningMode !== "auto"}
               className={cn(
                 "w-full relative overflow-hidden p-4 rounded-lg",
                 "transition-all duration-[250ms] ease-in-out",
                 "focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2",
                 "dark:focus-visible:ring-offset-slate-900",
+                "bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500",
                 // Hover state (when not running)
-                !isRunning && [
-                  "bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500",
-                  "hover:brightness-110",
-                  "hover:shadow-[0_0_12px_#2563eb80]",
-                ],
-                // Active/Generating state
-                isRunning && [
-                  "bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500",
+                !isRunning && "hover:brightness-110 hover:shadow-[0_0_12px_#2563eb80]",
+                // Active/Generating state (only when this button is running)
+                runningMode === "auto" && [
                   "animate-gradient-shift",
                   "brightness-125",
                   "shadow-[0_0_24px_rgba(37,99,235,1)]",
                   "scale-[1.02]",
                   "pointer-events-none",
                   "cursor-not-allowed"
-                ]
+                ],
+                // Disabled state
+                "disabled:opacity-50 disabled:cursor-not-allowed"
               )}
             >
               {/* Pulsing inner glow when generating */}
-              {isRunning && (
+              {runningMode === "auto" && (
                 <span className="absolute inset-0 bg-[radial-gradient(circle,_rgba(59,130,246,0.5)_0%,_transparent_70%)] animate-pulse rounded-lg" />
               )}
 
               <div className={cn(
-                "relative flex items-center gap-3 text-white",
-                isRunning && "text-white"
+                "relative flex items-center gap-3 text-white"
               )}>
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20">
                   <Zap className="h-5 w-5" />
                 </div>
                 <div className="flex-1 text-left">
                   <div className="font-semibold">
-                    {isRunning ? "Generating…" : "Generate Bundle (Auto)"}
+                    {runningMode === "auto" ? "Generating…" : "Generate Bundle (Auto)"}
                   </div>
                   <div className="text-xs opacity-90">Full pipeline, AI picks best idea</div>
                 </div>
