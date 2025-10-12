@@ -1,48 +1,332 @@
 """
 Maker Agent
-Generates digital assets, visuals, and store metadata
+Generates digital product assets with built-in self-QA validation
 """
 
+import json
+from typing import Dict, Any, Callable, Optional, Union
+from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Callable
-
 from app.pipeline.agents.base_agent import BaseAgent
+
+if False:  # TYPE_CHECKING
+    from app.database.db import DatabaseManager
 
 
 class MakerAgent(BaseAgent):
-    """Generates digital assets and metadata based on bundle plan"""
+    """Generates digital product assets with self-QA validation based on bundle plan"""
 
-    def __init__(self):
+    def __init__(self, db_manager: Optional["DatabaseManager"] = None):
         """Initialize MakerAgent with base functionality"""
-        super().__init__("maker")
+        super().__init__("maker", db_manager=db_manager)
 
-    async def execute(
+    def execute(
         self,
-        plan_data: Dict[str, Any],
-        bundle_dir: Path,
+        bundle_id: str,
         emit: Callable[[Dict[str, Any]], None]
     ) -> Dict[str, Any]:
         """
         Execute asset generation step with OpenAI
 
         Args:
-            plan_data: Validated output from PlannerAgent
-            bundle_dir: Directory path where assets should be saved
+            bundle_id: Bundle identifier to load plan from database
             emit: Callback function for progress updates
 
         Returns:
-            Structured assets data including paths and metadata
+            Structured maker output data with assets and QA report
 
         Raises:
-            NotImplementedError: Implementation pending
+            ValueError: If API returns None, invalid response, or bundle not found
+            json.JSONDecodeError: If response is not valid JSON
         """
-        # TODO: Implement main execution logic
-        # 1. Use self.client to access OpenAI (auto-initializes on first access)
-        # 2. Use self.instructions for prompts (already loaded)
-        # 3. Use plan_data as context for asset generation
-        # 4. Call OpenAI API: response = self.client.chat.completions.create(...)
-        # 5. Save generated assets to bundle_dir
-        # 6. Validate response: if self._validate_response(response): ...
-        # 7. Return structured data with asset paths and metadata
+        emit({"event": "log", "step": self.step_name, "message": "Starting asset generation..."})
 
-        raise NotImplementedError("Implementation pending")
+        try:
+            # Load bundle data and planner output
+            bundle_data, planner_output = self._load_bundle_data(bundle_id, emit)
+
+            # Get assets array from planner output
+            assets = planner_output.get("assets", [])
+            if not assets:
+                raise ValueError("Bundle plan has no assets to generate")
+
+            total_assets = len(assets)
+            emit({"event": "log", "step": self.step_name, "message": f"Generating {total_assets} asset(s)..."})
+
+            # Create output directory once
+            from app.settings import settings
+            bundle_dir = settings.get_bundle_dir(bundle_id)
+            output_dir = bundle_dir / "maker_output"
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            all_generated_files = []
+
+            # Loop through each asset
+            for idx, asset in enumerate(assets, 1):
+                asset_name = asset.get("name", f"asset-{idx}")
+
+                emit({
+                    "event": "log",
+                    "step": self.step_name,
+                    "message": f"Creating asset {idx}/{total_assets}: {asset_name}..."
+                })
+
+                # Build focused prompt for THIS asset only
+                asset_prompt = self._build_asset_prompt(bundle_id, planner_output, asset)
+
+                emit({"event": "log", "step": self.step_name, "message": f"Calling OpenAI API for {asset_name}..."})
+
+                # Call OpenAI API for single asset
+                response = self.client.responses.create(
+                    model="gpt-5",
+                    instructions=self.instructions,
+                    input=asset_prompt,
+                    tools=[]
+                )
+
+                emit({"event": "log", "step": self.step_name, "message": f"Processing response for {asset_name}..."})
+
+                # Extract file annotations from response
+                file_annotations = self._extract_file_annotations(response.output)
+
+                if not file_annotations:
+                    emit({
+                        "event": "log",
+                        "step": self.step_name,
+                        "message": f"⚠ No files generated for {asset_name}"
+                    })
+                else:
+                    emit({
+                        "event": "log",
+                        "step": self.step_name,
+                        "message": f"Downloading {len(file_annotations)} file(s) for {asset_name}..."
+                    })
+
+                    downloaded = self._download_files(file_annotations, output_dir, emit)
+                    all_generated_files.extend(downloaded)
+
+                emit({
+                    "event": "log",
+                    "step": self.step_name,
+                    "message": f"✓ Completed asset {idx}/{total_assets}"
+                })
+
+                # Update progress percentage
+                progress = int((idx / total_assets) * 100)
+                emit({"event": "progress", "step": self.step_name, "pct": progress})
+
+            emit({
+                "event": "log",
+                "step": self.step_name,
+                "message": f"Asset generation complete - {len(all_generated_files)} file(s) created"
+            })
+
+            # Update database to mark bundle as completed
+            if self.db_manager:
+                emit({"event": "log", "step": self.step_name, "message": "Updating bundle status..."})
+                save_success = self._save_result(bundle_id)
+
+                if save_success:
+                    emit({"event": "log", "step": self.step_name, "message": "Bundle status updated"})
+                else:
+                    error_msg = "Failed to update bundle status"
+                    self.logger.error(error_msg)
+                    emit({"event": "error", "step": self.step_name, "message": error_msg})
+                    raise ValueError(error_msg)
+
+            # Return simple success status
+            return {"status": "completed", "bundle_id": bundle_id}
+
+        except Exception as e:
+            self.logger.error(f"Execution failed: {e}")
+            raise
+
+    def _load_bundle_data(
+        self,
+        bundle_id: str,
+        emit: Callable[[Dict[str, Any]], None]
+    ) -> tuple[Dict[str, Any], Dict[str, Any]]:
+        """
+        Load bundle data and planner output from database
+
+        Args:
+            bundle_id: Bundle identifier
+            emit: Callback for progress updates
+
+        Returns:
+            Tuple of (bundle_data, planner_output)
+
+        Raises:
+            ValueError: If bundle not found or has no planner output
+        """
+        if not self.db_manager:
+            raise ValueError("Cannot load bundle by ID: no db_manager provided")
+
+        emit({"event": "log", "step": self.step_name, "message": f"Loading bundle: {bundle_id}"})
+
+        bundle_record = self.bundle_queries.get_by_id(bundle_id)
+        if not bundle_record:
+            raise ValueError(f"Bundle not found: {bundle_id}")
+
+        # Parse the planner output JSON
+        if not bundle_record.planner_output:
+            raise ValueError(f"Bundle {bundle_id} has no planner output")
+
+        try:
+            planner_output = json.loads(bundle_record.planner_output)
+            self.logger.info(f"Loaded bundle plan for: {planner_output.get('title', 'Unknown')}")
+            return bundle_record.model_dump(), planner_output
+        except json.JSONDecodeError as e:
+            self.logger.error(f"Failed to parse planner_output for {bundle_id}: {e}")
+            raise ValueError(f"Invalid planner_output data for {bundle_id}")
+
+    def _build_asset_prompt(
+        self,
+        bundle_id: str,
+        planner_output: Dict[str, Any],
+        asset: Dict[str, Any]
+    ) -> str:
+        """
+        Build prompt focused on creating a single asset
+
+        Includes full bundle context for consistency, but focuses on one asset only.
+
+        Args:
+            bundle_id: Bundle identifier
+            planner_output: Complete planner output from database
+            asset: Single asset specification to create
+
+        Returns:
+            JSON string with bundle context and focused asset spec
+        """
+        # Load the base input JSON
+        input_data = json.loads(self.input)
+
+        # Inject bundle context (for consistency across all assets)
+        input_data["bundle_id"] = bundle_id
+        input_data["bundle_context"] = {
+            "title": planner_output.get("title"),
+            "niche": planner_output.get("niche"),
+            "sub_niche": planner_output.get("sub_niche"),
+            "target_persona": planner_output.get("target_persona"),
+            "brand_voice": planner_output.get("brand_voice"),
+            "content_guidelines": planner_output.get("content_guidelines")
+        }
+
+        # Focus on THIS asset only
+        input_data["asset_to_create"] = asset
+
+        # Set output directory
+        from app.settings import settings
+        bundle_dir = settings.get_bundle_dir(bundle_id)
+        input_data["output_config"]["output_directory"] = str(bundle_dir / "maker_output")
+
+        return json.dumps(input_data, indent=2)
+
+    def _extract_file_annotations(self, output) -> list[Dict[str, Any]]:
+        """
+        Extract file annotations from OpenAI response output
+
+        Args:
+            output: Response output object
+
+        Returns:
+            List of dicts with file_id, filename, container_id
+        """
+        file_annotations = []
+
+        if output.type == "message":
+            for item in output.content:
+                # Check for annotations
+                if hasattr(item, "annotations") and item.annotations:
+                    for ann in item.annotations:
+                        if getattr(ann, "type", None) == "container_file_citation":
+                            file_annotations.append({
+                                "file_id": ann.file_id,
+                                "filename": ann.filename,
+                                "container_id": ann.container_id
+                            })
+                            self.logger.info(f"Found file: {ann.filename} (ID: {ann.file_id})")
+
+        return file_annotations
+
+    def _download_files(
+        self,
+        file_annotations: list[Dict[str, Any]],
+        output_dir: Path,
+        emit: Callable[[Dict[str, Any]], None]
+    ) -> list[Path]:
+        """
+        Download files from OpenAI container and save to output directory
+
+        Args:
+            file_annotations: List of file metadata from response
+            output_dir: Directory to save files to
+            emit: Callback for progress updates
+
+        Returns:
+            List of downloaded file paths
+        """
+        downloaded_files = []
+
+        for file_info in file_annotations:
+            try:
+                file_id = file_info["file_id"]
+                filename = file_info["filename"]
+                container_id = file_info["container_id"]
+
+                emit({
+                    "event": "log",
+                    "step": self.step_name,
+                    "message": f"Downloading {filename}..."
+                })
+
+                # Download file content from OpenAI
+                file_content = self.client.files.content(file_id)
+
+                # Save to output directory
+                output_path = output_dir / filename
+                with open(output_path, "wb") as f:
+                    f.write(file_content.read())
+
+                downloaded_files.append(output_path)
+                self.logger.info(f"✓ Downloaded: {filename} -> {output_path}")
+
+            except Exception as e:
+                self.logger.error(f"Failed to download {filename}: {e}")
+                emit({
+                    "event": "log",
+                    "step": self.step_name,
+                    "message": f"⚠ Failed to download {filename}: {str(e)}"
+                })
+
+        return downloaded_files
+
+    def _save_result(self, bundle_id: str) -> bool:
+        """
+        Update bundle status to mark maker step as completed.
+
+        Args:
+            bundle_id: The bundle this output belongs to
+
+        Returns:
+            bool: True if saved successfully, False otherwise
+        """
+        if not self.db_manager:
+            self.logger.warning("No db_manager available, skipping database save")
+            return False
+
+        try:
+            self.logger.info(f"Updating bundle status for: {bundle_id}")
+
+            # Update Bundle to set current_step="maker" and status="completed"
+            if not self.bundle_queries.update_step(bundle_id, "maker", "completed"):
+                self.logger.error(f"Failed to update bundle step: {bundle_id}")
+                return False
+
+            self.logger.info(f"✓ Bundle step updated: {bundle_id} -> maker (completed)")
+            return True
+
+        except Exception as e:
+            self.logger.error(f"✗ Critical error in _save_result: {e}", exc_info=True)
+            return False

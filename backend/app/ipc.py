@@ -72,6 +72,19 @@ class IPCServer:
 
             await self.orchestrator.run_from_idea(idea_id, self.emit_event)
 
+        elif cmd == "generate_assets_from_bundle":
+            params = command.get("params", {})
+            bundle_id = params.get("bundle_id")
+
+            if not bundle_id:
+                self.emit_error(None, "No bundle_id provided")
+                return
+
+            # Use real orchestrator for generating assets
+            self._set_orchestrator(False)
+
+            await self.orchestrator.run_maker_from_bundle(bundle_id, self.emit_event)
+
         elif cmd == "re_run_step":
             params = command.get("params", {})
             bundle_id = params.get("bundle_id")
@@ -313,6 +326,99 @@ class IPCServer:
             except Exception as e:
                 logger.error(f"Failed to get library stats: {e}", exc_info=True)
                 self.emit_error(None, f"Failed to retrieve library stats: {str(e)}")
+
+        elif cmd == "get_research_sessions":
+            try:
+                logger.info("Handling get_research_sessions command")
+
+                # Ensure orchestrator is initialized
+                self._set_orchestrator(False)
+
+                params = command.get("params", {})
+                limit = params.get("limit", 100)
+
+                from app.database.queries import ResearchQueries
+                research_queries = ResearchQueries(self.orchestrator.db_manager)
+                sessions = research_queries.get_all(limit=limit)
+                logger.info(f"Retrieved {len(sessions)} research sessions from database")
+
+                self.emit_event({
+                    "event": "research_sessions_list",
+                    "sessions": [session.model_dump() for session in sessions],
+                    "total": len(sessions)
+                })
+                logger.info(f"Emitted research_sessions_list event with {len(sessions)} sessions")
+
+            except Exception as e:
+                logger.error(f"Failed to get research sessions: {e}", exc_info=True)
+                self.emit_error(None, f"Failed to retrieve research sessions: {str(e)}")
+
+        elif cmd == "get_created_bundles":
+            try:
+                logger.info("Handling get_created_bundles command")
+
+                # Ensure orchestrator is initialized
+                self._set_orchestrator(False)
+
+                params = command.get("params", {})
+                limit = params.get("limit", 100)
+
+                from app.database.queries import CreatedBundleQueries
+                created_bundle_queries = CreatedBundleQueries(self.orchestrator.db_manager)
+                bundles = created_bundle_queries.get_all(limit=limit)
+                logger.info(f"Retrieved {len(bundles)} completed bundles from database")
+
+                self.emit_event({
+                    "event": "completed_bundles_list",
+                    "bundles": [bundle.model_dump() for bundle in bundles],
+                    "total": len(bundles)
+                })
+                logger.info(f"Emitted completed_bundles_list event with {len(bundles)} bundles")
+
+            except Exception as e:
+                logger.error(f"Failed to get completed bundles: {e}", exc_info=True)
+                self.emit_error(None, f"Failed to retrieve completed bundles: {str(e)}")
+
+        elif cmd == "open_folder":
+            params = command.get("params", {})
+            path = params.get("path")
+
+            if not path:
+                self.emit_error(None, "No path provided")
+                return
+
+            try:
+                import platform
+                import subprocess
+                from pathlib import Path
+
+                # Convert to Path object and get parent directory
+                folder_path = Path(path).parent if Path(path).is_file() else Path(path)
+
+                # Ensure path exists
+                if not folder_path.exists():
+                    self.emit_error(None, f"Path does not exist: {folder_path}")
+                    return
+
+                # Open file explorer based on platform
+                system = platform.system()
+                if system == "Windows":
+                    subprocess.Popen(f'explorer "{folder_path}"')
+                elif system == "Darwin":  # macOS
+                    subprocess.Popen(["open", str(folder_path)])
+                else:  # Linux
+                    subprocess.Popen(["xdg-open", str(folder_path)])
+
+                logger.info(f"Opened folder: {folder_path}")
+                self.emit_event({
+                    "event": "folder_opened",
+                    "success": True,
+                    "path": str(folder_path)
+                })
+
+            except Exception as e:
+                logger.error(f"Failed to open folder: {e}", exc_info=True)
+                self.emit_error(None, f"Failed to open folder: {str(e)}")
 
         elif cmd == "reset_database":
             from app.settings import settings

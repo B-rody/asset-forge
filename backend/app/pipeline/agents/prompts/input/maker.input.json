@@ -1,0 +1,86 @@
+{
+  "mode": "generate_from_plan",
+  "bundle_id": "",
+  "output_schema_version": "maker.v1.0",
+
+  "bundle_context": {
+    "title": "",
+    "niche": "",
+    "sub_niche": "",
+    "target_persona": {
+      "age_range": "",
+      "occupation": "",
+      "pain_points": [],
+      "goals": [],
+      "technical_skill_level": ""
+    },
+    "brand_voice": {
+      "tone": "",
+      "style": "",
+      "language_level": "",
+      "terms_to_avoid": []
+    },
+    "content_guidelines": {
+      "formatting_rules": [],
+      "visual_style": "",
+      "accessibility_requirements": []
+    }
+  },
+
+  "asset_to_create": {
+    "asset_id": "",
+    "type": "",
+    "name": "",
+    "description": "",
+    "content_specs": {
+      "sections": [],
+      "features": [],
+      "page_count": 0,
+      "additional_notes": ""
+    },
+    "format": "",
+    "target_file_size_mb": 0,
+    "includes_fillable_fields": false
+  },
+
+  "generation_preferences": {
+    "quality_level": "high",
+    "optimization": {
+      "compress_images": true,
+      "optimize_file_sizes": true,
+      "target_total_size_mb": 25
+    },
+    "formatting": {
+      "use_professional_fonts": true,
+      "consistent_styling": true,
+      "accessibility_compliant": true
+    }
+  },
+
+  "qa_thresholds": {
+    "minimum_completeness_score": 0.90,
+    "minimum_quality_score": 0.85,
+    "fail_on_missing_sections": true,
+    "fail_on_format_mismatch": true
+  },
+
+  "output_config": {
+    "output_directory": "",
+    "create_subdirectories": true,
+    "naming_pattern": "{asset_id}_{name}.{format}",
+    "generate_thumbnails": false
+  },
+
+  "constraints": {
+    "max_file_size_mb": 50,
+    "max_generation_time_seconds": 300,
+    "supported_formats": ["PDF", "PNG", "JPG", "SVG", "DOCX", "XLSX", "TXT", "MD", "CSV", "HTML"]
+  },
+
+  "emit": {
+    "json_only": true,
+    "no_markdown": true,
+    "strict_required_fields": true,
+    "include_file_hashes": true
+  }
+}

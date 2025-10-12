@@ -14,7 +14,7 @@ from app.settings import settings
 from app.database import DatabaseManager, BundleQueries
 from app.pipeline.agents.researcher import ResearcherAgent
 from app.pipeline.agents.planner import PlannerAgent
-# from app.pipeline.agents.maker import MakerAgent
+from app.pipeline.agents.maker import MakerAgent
 # from app.pipeline.agents.packager import PackagerAgent
 
 logger = setup_logger(__name__)
@@ -31,7 +31,7 @@ class PipelineOrchestrator:
         # Initialize agents with database access
         self.researcher = ResearcherAgent(db_manager=self.db_manager)
         self.planner = PlannerAgent(db_manager=self.db_manager)
-        #self.maker = MakerAgent(db_manager=self.db_manager)
+        self.maker = MakerAgent(db_manager=self.db_manager)
         #self.packager = PackagerAgent(db_manager=self.db_manager)
 
     async def run_pipeline(
@@ -99,7 +99,8 @@ class PipelineOrchestrator:
             })
 
         except Exception as e:
-            logger.error(f"Pipeline failed: {e}", exc_info=True)
+            # Don't re-log the error here since agents already log it with their step name
+            # Just emit error event and done status
 
             # Emit error event with step name for log display
             emit({"event": "error", "step": "Researcher", "message": str(e)})
@@ -156,10 +157,76 @@ class PipelineOrchestrator:
             })
 
         except Exception as e:
-            logger.error(f"Pipeline failed: {e}", exc_info=True)
+            # Don't re-log the error here since agents already log it with their step name
+            # Just emit error event and done status
 
             # Emit error event with step name for log display
             emit({"event": "error", "step": "Planner", "message": str(e)})
+
+            # Emit done event with failure status (don't re-raise)
+            emit({
+                "event": "done",
+                "success": False,
+                "error": str(e)
+            })
+
+    async def run_maker_from_bundle(
+        self,
+        bundle_id: str,
+        emit: Callable[[Dict[str, Any]], None]
+    ):
+        """
+        Run just the Maker step for an existing bundle
+        Assumes bundle has completed planner step and has planner_output
+
+        Args:
+            bundle_id: ID of the bundle to generate assets for
+            emit: Callback to send events to frontend
+        """
+        logger.info(f"Starting Maker for bundle: {bundle_id}")
+        emit({"event": "log", "step": "Orchestrator", "message": f"Generating assets for bundle {bundle_id}..."})
+
+        try:
+            # Validate bundle exists and has planner output
+            bundle_record = self.bundle_queries.get_by_id(bundle_id)
+            if not bundle_record:
+                raise ValueError(f"Bundle not found: {bundle_id}")
+
+            if not bundle_record.planner_output:
+                raise ValueError(f"Bundle {bundle_id} has no planner output. Run planner first.")
+
+            # Step 1: Run maker with bundle_id
+            emit({"event": "log", "step": "Maker", "message": "Generating assets..."})
+            emit({"event": "progress", "step": "Maker", "pct": 0})
+
+            # Run maker in thread pool (sync agent in async context)
+            loop = asyncio.get_event_loop()
+            maker_result = await loop.run_in_executor(
+                None,
+                partial(self.maker.execute, bundle_id=bundle_id, emit=emit)
+            )
+
+            emit({"event": "progress", "step": "Maker", "pct": 100})
+            emit({"event": "log", "step": "Orchestrator", "message": "Asset generation complete"})
+
+            # TODO: Add packager step when ready
+
+            # Emit done event
+            emit({
+                "event": "done",
+                "success": True,
+                "result": {
+                    "bundle_id": bundle_id,
+                    "status": "Assets generated successfully"
+                }
+            })
+
+        except Exception as e:
+            # Don't re-log the error here since agents already log it with their step name
+            # Just emit error event and done status
+
+            # Emit error event with step name for log display
+            emit({"event": "error", "step": "Maker", "message": str(e)})
 
             # Emit done event with failure status (don't re-raise)
             emit({

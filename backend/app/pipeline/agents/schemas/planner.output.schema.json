@@ -295,7 +295,7 @@
     "brand_voice": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["tone", "style", "language_level"],
+      "required": ["tone", "style", "language_level", "avoid_terms"],
       "description": "Brand voice and tone guidelines for all content creation.",
       "properties": {
         "tone": {
@@ -329,6 +329,7 @@
     "content_guidelines": {
       "type": "object",
       "additionalProperties": false,
+      "required": ["formatting_rules", "visual_style", "accessibility_requirements"],
       "description": "Technical and stylistic guidelines for asset creation.",
       "properties": {
         "formatting_rules": {
@@ -358,7 +359,7 @@
     "pricing": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["strategy", "recommended_price_usd", "price_rationale"],
+      "required": ["strategy", "recommended_price_usd", "price_rationale", "observed_price_range"],
       "description": "Pricing strategy and justification based on research and positioning.",
       "properties": {
         "strategy": {
@@ -399,6 +400,7 @@
     "marketplace_metadata": {
       "type": "object",
       "additionalProperties": false,
+      "required": ["etsy", "gumroad"],
       "description": "Complete marketplace listing metadata for each target platform.",
       "properties": {
         "etsy": {
@@ -456,7 +458,7 @@
         "gumroad": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["name", "description", "price_usd"],
+          "required": ["name", "description", "price_usd", "short_url_slug"],
           "description": "Gumroad-specific listing metadata.",
           "properties": {
             "name": {

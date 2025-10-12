@@ -3,6 +3,7 @@ import { Database, Lightbulb, Package } from "lucide-react";
 import { ipcClient } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
 import { IdeasView } from "./IdeasView";
+import { BundlesView } from "./BundlesView";
 
 type LibraryTab = "ideas" | "bundles";
 
@@ -11,7 +12,12 @@ interface LibraryStats {
   bundles_count: number;
 }
 
-export function LibraryPanel() {
+interface LibraryPanelProps {
+  onBuildBundle?: (ideaId: string) => void;
+  onGenerateAssets?: (bundleId: string) => void;
+}
+
+export function LibraryPanel({ onBuildBundle, onGenerateAssets }: LibraryPanelProps) {
   const [activeTab, setActiveTab] = useState<LibraryTab>("ideas");
   const [stats, setStats] = useState<LibraryStats>({ ideas_count: 0, bundles_count: 0 });
 
@@ -88,14 +94,8 @@ export function LibraryPanel() {
 
       {/* Content */}
       <div>
-        {activeTab === "ideas" && <IdeasView />}
-        {activeTab === "bundles" && (
-          <div className="rounded-lg border border-border bg-card p-6">
-            <p className="text-sm text-muted-foreground">
-              Bundles view coming soon...
-            </p>
-          </div>
-        )}
+        {activeTab === "ideas" && <IdeasView onBuildBundle={onBuildBundle} />}
+        {activeTab === "bundles" && <BundlesView onGenerateAssets={onGenerateAssets} />}
       </div>
     </div>
   );

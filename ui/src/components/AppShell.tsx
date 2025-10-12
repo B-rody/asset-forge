@@ -6,10 +6,10 @@ import { ResultPanel } from "./ResultPanel";
 import { StepChips } from "./StepChips";
 import { LogStream } from "./LogStream";
 import { LibraryPanel } from "./LibraryPanel";
-import { IdeasView } from "./IdeasView";
+import { HistoryPanel } from "./HistoryPanel";
 import { ipcClient, IPCEvent } from "@/lib/ipc";
 
-type TabId = "one-click" | "ideas" | "library" | "history";
+type TabId = "one-click" | "library" | "history";
 
 interface StepChip {
   name: string;
@@ -105,7 +105,7 @@ export function AppShell() {
             timestamp: now,
             message: success
               ? researchOnly
-                ? "Research completed! Navigating to Ideas tab..."
+                ? "Research completed! Navigating to Library..."
                 : wasPlanMode
                 ? "Bundle plan created successfully! Navigating to Library..."
                 : "Pipeline completed successfully!"
@@ -127,10 +127,10 @@ export function AppShell() {
         setPipelineStartTime(null);
         setRunningMode(null);
 
-        // If research-only mode completed successfully, navigate to Ideas tab
+        // If research-only mode completed successfully, navigate to Library tab
         if (success && researchOnly) {
           setTimeout(() => {
-            setActiveTab("ideas");
+            setActiveTab("library");
           }, 1500); // Brief delay to let user see success message
         }
 
@@ -221,6 +221,24 @@ export function AppShell() {
     });
   };
 
+  const handleGenerateAssets = (bundleId: string) => {
+    // Reset state for new pipeline run - only show Maker step
+    handleRunStart([
+      { name: "Maker", status: "pending" },
+    ]);
+    setRunningMode("auto");
+
+    // Switch to Generate tab to show pipeline progress
+    setActiveTab("one-click");
+
+    // Send IPC command to generate assets from bundle
+    // TODO: Backend needs to implement this command
+    ipcClient.sendCommand({
+      cmd: "generate_assets_from_bundle",
+      params: { bundle_id: bundleId }
+    });
+  };
+
   const handleResearchOnly = () => {
     // Reset state for research-only mode - only show Researcher step
     handleRunStart([
@@ -235,6 +253,14 @@ export function AppShell() {
     setRunningMode("auto");
   };
 
+  const handleOpenFolder = (path: string) => {
+    // Send IPC command to open folder in file explorer
+    ipcClient.sendCommand({
+      cmd: "open_folder",
+      params: { path }
+    });
+  };
+
   return (
     <div className="flex h-screen flex-col">
       <HeaderBar />
@@ -242,25 +268,13 @@ export function AppShell() {
         <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
         <main className="flex-1 overflow-y-auto p-6">
           <div className="mx-auto max-w-5xl xl:max-w-6xl 2xl:max-w-7xl space-y-6">
-            {activeTab === "ideas" ? (
-              <>
-                <div className="mb-6">
-                  <h1 className="text-2xl font-bold mb-2">Ideas Library</h1>
-                  <p className="text-muted-foreground">
-                    Browse and build from your research ideas
-                  </p>
-                </div>
-                <IdeasView onBuildBundle={handleCreatePlanFromIdea} />
-              </>
-            ) : activeTab === "library" ? (
-              <LibraryPanel />
+            {activeTab === "library" ? (
+              <LibraryPanel
+                onBuildBundle={handleCreatePlanFromIdea}
+                onGenerateAssets={handleGenerateAssets}
+              />
             ) : activeTab === "history" ? (
-              <div className="rounded-xl border border-border bg-gradient-to-b from-white to-slate-50 dark:from-slate-900 dark:to-slate-950 p-6 shadow-sm">
-                <h2 className="mb-2 text-lg font-semibold">Previous Runs</h2>
-                <div className="text-sm text-muted-foreground">
-                  <p>No previous runs yet. Start a generation to see history.</p>
-                </div>
-              </div>
+              <HistoryPanel onOpenFolder={handleOpenFolder} />
             ) : (
               <>
                 <RunPanel

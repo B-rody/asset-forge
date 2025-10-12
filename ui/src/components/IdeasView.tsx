@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Lightbulb, Filter, ArrowUpDown } from "lucide-react";
+import { Lightbulb, Filter, ArrowUpDown, Info } from "lucide-react";
 import { ipcClient } from "@/lib/ipc";
 import { IdeaCard } from "./IdeaCard";
 import { cn } from "@/lib/utils";
@@ -92,7 +92,7 @@ export function IdeasView({ onBuildBundle }: IdeasViewProps = {}) {
   return (
     <div className="space-y-4">
       {/* Controls */}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-3 items-center">
         {/* Priority Filter */}
         <div className="flex items-center gap-2">
           <Filter className="h-4 w-4 text-muted-foreground" />
@@ -122,6 +122,26 @@ export function IdeasView({ onBuildBundle }: IdeasViewProps = {}) {
             <option value="date_desc">Newest First</option>
             <option value="date_asc">Oldest First</option>
           </select>
+        </div>
+
+        {/* Info Tooltip */}
+        <div className="group relative">
+          <Info className="h-4 w-4 text-muted-foreground hover:text-primary cursor-help transition-colors" />
+          <div className="absolute left-0 top-6 z-50 hidden group-hover:block w-80 p-3 bg-popover border border-border rounded-lg shadow-lg">
+            <div className="space-y-2 text-xs">
+              <div>
+                <span className="font-semibold text-foreground">ROI:</span>
+                <span className="text-muted-foreground"> Calculated metric (reach × impact × confidence / effort)</span>
+              </div>
+              <div>
+                <span className="font-semibold text-foreground">Priority:</span>
+                <span className="text-muted-foreground"> Strategic judgment considering timing, differentiation, and market fit</span>
+              </div>
+              <p className="text-muted-foreground italic pt-1 border-t border-border">
+                Note: Priority B can have higher ROI than Priority A when strategic factors outweigh pure metrics
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Count */}
