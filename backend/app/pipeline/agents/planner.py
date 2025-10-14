@@ -4,11 +4,11 @@ Designs digital product bundle structure, personas, and pricing
 """
 
 import json
-from typing import Dict, Any, Callable, Optional, Union
+from typing import Dict, Any, Callable, Optional, Union, TYPE_CHECKING
 from datetime import datetime
 from app.pipeline.agents.base_agent import BaseAgent
 
-if False:  # TYPE_CHECKING
+if TYPE_CHECKING:
     from app.database.db import DatabaseManager
 
 

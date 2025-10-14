@@ -141,17 +141,143 @@ Create the specified asset following these steps:
 - [ ] Interactive elements work (if applicable)
 - [ ] No corruption or technical issues
 
+**Layout & Spacing Check (PDF/DOCX):**
+- [ ] No overlapping elements (text, fields, lines, images)
+- [ ] Minimum 20-30pt spacing between elements
+- [ ] Consistent margins (min 1 inch / 72pt on all sides)
+- [ ] Form fields properly positioned after labels (not overlapping)
+- [ ] Headers have adequate spacing above and below (40-50pt above, 20-30pt below)
+- [ ] Page breaks don't cut off content mid-element
+- [ ] All text is readable and not cut off or overlapping
+
 **If you find issues during QA, make corrections before finalizing.**
 
-### 3. FINALIZE AND SAVE
+### 3. CREATE FILE(S) IN CODE_INTERPRETER
 
-After completing your internal QA check and making any necessary edits:
+**CRITICAL: Use code_interpreter to generate actual file(s).**
 
-1. **Finalize the file** - Ensure it's in the correct format
-2. **Save to output directory** - Use the specified output path
-3. **Verify file integrity** - Confirm the file opens and renders correctly
+You must create the actual digital product file(s) using Python in the code_interpreter container:
 
-The file will be automatically downloaded and stored in the bundle's maker_output directory.
+1. **Generate the file content** using appropriate Python libraries (reportlab for PDF, openpyxl for XLSX, python-docx for DOCX, etc.)
+2. **Save file(s) in the container** - they will be automatically downloaded by the system
+3. **Use the exact format specified** in the asset specification
+4. **Create multiple files if needed** (e.g., main file + supporting files, images, templates)
+
+### PDF LAYOUT BEST PRACTICES (CRITICAL FOR PROFESSIONAL OUTPUT)
+
+**CRITICAL: Always calculate positions to prevent overlaps!**
+
+When creating PDFs with reportlab, follow these spacing rules to ensure professional, readable output:
+
+**Spacing Requirements:**
+- **Minimum vertical spacing between elements**: 20-30 points
+- **Section headers**: 40-50 points above, 20-30 points below
+- **Form fields**: 30-40 points between fields
+- **Margins**: Minimum 72 points (1 inch) on all sides
+- **Line spacing**: 1.5x font size for body text
+
+**Position Calculation Pattern:**
+```python
+# Start from top of page and work downward
+y_position = page_height - top_margin
+
+# For each element, draw then SUBTRACT its height + spacing
+y_position -= header_height + spacing_below_header
+
+# Before drawing next element, CHECK if it fits on page
+if y_position < bottom_margin + element_height:
+    pdf.showPage()  # Start new page
+    y_position = page_height - top_margin
+```
+
+**Overlap Prevention Checklist:**
+1. ✓ Always track current Y position as you draw elements
+2. ✓ Subtract element height PLUS spacing after drawing each element
+3. ✓ Check if next element fits before drawing (add page break if needed)
+4. ✓ Use `stringWidth()` to calculate text width and position fields accordingly
+5. ✓ Test that form field positions don't overlap with labels
+
+**Bad Example (causes overlaps):**
+```python
+pdf.drawString(100, 700, "Name:")
+pdf.drawString(100, 700, "______")  # ❌ Same Y position - will overlap!
+```
+
+**Good Example (proper spacing):**
+```python
+y = 700
+pdf.setFont("Helvetica-Bold", 14)
+pdf.drawString(100, y, "Personal Information")
+y -= 30  # Space below header
+
+pdf.setFont("Helvetica", 11)
+pdf.drawString(100, y, "Name:")
+# Calculate label width to position field properly
+label_width = pdf.stringWidth("Name: ", "Helvetica", 11)
+pdf.line(100 + label_width, y - 2, 400, y - 2)  # Underline for fill-in
+y -= 35  # Space before next field (30pt spacing + 5pt buffer)
+```
+
+**Key Principle:** After drawing ANY element, immediately subtract its height plus spacing from y_position. Never draw two elements at the same Y coordinate unless intentionally side-by-side.
+
+Example for PDF (with proper spacing):
+```python
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.units import inch
+
+# Initialize with proper margins
+pdf = canvas.Canvas("weekly-tracker.pdf", pagesize=letter)
+width, height = letter
+margin = inch  # 72 points = 1 inch
+y = height - margin  # Start from top
+
+# Title with proper spacing
+pdf.setFont("Helvetica-Bold", 18)
+pdf.drawString(margin, y, "Weekly Progress Tracker")
+y -= 50  # Space below title (50pt for visual separation)
+
+# Section header
+pdf.setFont("Helvetica-Bold", 14)
+pdf.drawString(margin, y, "Daily Log")
+y -= 30  # Space below section header
+
+# Form fields with labels - iterate through days
+pdf.setFont("Helvetica", 11)
+for day in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]:
+    # Check if we need new page (need 40pt for this element)
+    if y < margin + 40:
+        pdf.showPage()
+        y = height - margin
+
+    # Draw day label
+    pdf.drawString(margin, y, f"{day}:")
+
+    # Calculate label width to position field properly
+    label_width = pdf.stringWidth(f"{day}: ", "Helvetica", 11)
+
+    # Draw underline for fill-in field (properly positioned after label)
+    pdf.line(margin + label_width, y - 2, width - margin, y - 2)
+
+    y -= 35  # Space before next field (30pt minimum + 5pt buffer)
+
+pdf.save()
+```
+
+Example for Excel:
+```python
+from openpyxl import Workbook
+
+wb = Workbook()
+ws = wb.active
+ws.title = "Offer Comparison"
+ws['A1'] = "Company"
+# ... add all content per specification ...
+wb.save("offer-comparison-calculator.xlsx")
+```
+
+**The file(s) you create will be automatically extracted and downloaded by the system.**
+You don't need to worry about download paths - just create properly named file(s) in the correct format.
 
 ## QUALITY STANDARDS
 
@@ -160,7 +286,9 @@ The file will be automatically downloaded and stored in the bundle's maker_outpu
 - Consistent formatting throughout
 - Clear visual hierarchy (headings, bullets, spacing)
 - Professional fonts and styling
-- Proper alignment and spacing
+- **Proper spacing with NO overlapping elements (min 20-30pt between elements)**
+- **Consistent margins (minimum 1 inch / 72pt on all sides)**
+- **Form fields properly positioned and sized (not overlapping labels)**
 - No placeholder text
 - Complete instructions/labels
 - Accessibility compliant (contrast, font size, alt text)
@@ -213,13 +341,16 @@ If you identify issues during QA, make corrections before finalizing the file.
 
 ✗ **Format Mismatches**: Planner says PDF, you generate DOCX. Always match specified format.
 
+✗ **Overlapping Elements**: Drawing text/fields at same Y coordinate, or not subtracting element height after drawing. Always calculate positions carefully and leave adequate spacing (min 20-30pt between elements). This is especially critical for PDFs where overlapping text makes content unreadable.
+
 ## FILE ORGANIZATION
 
-**File Paths:**
-- All paths are relative to bundle output directory
+**File Naming:**
 - Use naming pattern: `{asset_id}_{name}.{format}` (e.g., "asset-001_tracker.pdf")
 - Keep file names clean: lowercase, hyphens instead of spaces
-- Organize in subdirectories if bundle_structure specifies folders
+- Create files with these names in the code_interpreter container
+
+**Note:** You create files in the container with simple names. The system will download them to the bundle output directory automatically. You don't need to worry about paths.
 
 **Example Bundle Structure:**
 ```

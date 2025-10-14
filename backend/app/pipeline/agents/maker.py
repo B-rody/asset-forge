@@ -4,12 +4,12 @@ Generates digital product assets with built-in self-QA validation
 """
 
 import json
-from typing import Dict, Any, Callable, Optional, Union
+from typing import Dict, Any, Callable, Optional, Union, TYPE_CHECKING
 from datetime import datetime
 from pathlib import Path
 from app.pipeline.agents.base_agent import BaseAgent
 
-if False:  # TYPE_CHECKING
+if TYPE_CHECKING:
     from app.database.db import DatabaseManager
 
 
@@ -70,6 +70,16 @@ class MakerAgent(BaseAgent):
                     "step": self.step_name,
                     "message": f"Creating asset {idx}/{total_assets}: {asset_name}..."
                 })
+                
+                container_name = f"{asset_name}-container-{idx:04d}"
+
+                container = self.client.containers.create(
+                    name=container_name,
+                    expires_after={
+                        "anchor": "last_active_at",
+                        "minutes": 20
+                    }
+                )
 
                 # Build focused prompt for THIS asset only
                 asset_prompt = self._build_asset_prompt(bundle_id, planner_output, asset)
@@ -78,18 +88,34 @@ class MakerAgent(BaseAgent):
 
                 # Call OpenAI API for single asset
                 response = self.client.responses.create(
-                    model="gpt-5",
+                    model="gpt-5-mini",
                     instructions=self.instructions,
                     input=asset_prompt,
-                    tools=[]
+                    tools=[
+                        {
+                            "type": "code_interpreter",
+                            "container": container.id
+                        }
+                    ],
+                    tool_choice="required"
                 )
 
                 emit({"event": "log", "step": self.step_name, "message": f"Processing response for {asset_name}..."})
 
-                # Extract file annotations from response
-                file_annotations = self._extract_file_annotations(response.output)
+                # Check response status
+                if response.status != "completed":
+                    error_msg = f"Response status: {response.status} for {asset_name}"
+                    self.logger.error(error_msg)
+                    emit({"event": "error", "step": self.step_name, "message": error_msg})
+                    continue  # Skip to next asset
 
-                if not file_annotations:
+                # Get list of files from container
+                files = self.client.containers.files.list(container_id=container.id)
+
+                # Convert to list for length check
+                files_list = list(files.data) if files and hasattr(files, 'data') else []
+
+                if not files_list:
                     emit({
                         "event": "log",
                         "step": self.step_name,
@@ -99,10 +125,9 @@ class MakerAgent(BaseAgent):
                     emit({
                         "event": "log",
                         "step": self.step_name,
-                        "message": f"Downloading {len(file_annotations)} file(s) for {asset_name}..."
+                        "message": f"Downloading {len(files_list)} file(s) for {asset_name}..."
                     })
-
-                    downloaded = self._download_files(file_annotations, output_dir, emit)
+                    downloaded = self._download_files(files=files_list, container_id=container.id, output_dir=output_dir, emit=emit)
                     all_generated_files.extend(downloaded)
 
                 emit({
@@ -223,7 +248,7 @@ class MakerAgent(BaseAgent):
 
         return json.dumps(input_data, indent=2)
 
-    def _extract_file_annotations(self, output) -> list[Dict[str, Any]]:
+    def _extract_file_annotations(self, response) -> list[Dict[str, Any]]:
         """
         Extract file annotations from OpenAI response output
 
@@ -234,25 +259,26 @@ class MakerAgent(BaseAgent):
             List of dicts with file_id, filename, container_id
         """
         file_annotations = []
-
-        if output.type == "message":
-            for item in output.content:
-                # Check for annotations
-                if hasattr(item, "annotations") and item.annotations:
-                    for ann in item.annotations:
-                        if getattr(ann, "type", None) == "container_file_citation":
-                            file_annotations.append({
-                                "file_id": ann.file_id,
-                                "filename": ann.filename,
-                                "container_id": ann.container_id
-                            })
-                            self.logger.info(f"Found file: {ann.filename} (ID: {ann.file_id})")
+        for output in response.output:
+            if getattr(output, "type", None) == "message":
+                for item in output.content:
+                    # Check for annotations
+                    if hasattr(item, "annotations") and item.annotations:
+                        for ann in item.annotations:
+                            if getattr(ann, "type", None) == "container_file_citation":
+                                file_annotations.append({
+                                    "file_id": ann.file_id,
+                                    "filename": ann.filename,
+                                    "container_id": ann.container_id
+                                })
+                                self.logger.info(f"Found file: {ann.filename} (ID: {ann.file_id})")
 
         return file_annotations
 
     def _download_files(
         self,
-        file_annotations: list[Dict[str, Any]],
+        files: list,
+        container_id: str,
         output_dir: Path,
         emit: Callable[[Dict[str, Any]], None]
     ) -> list[Path]:
@@ -260,7 +286,8 @@ class MakerAgent(BaseAgent):
         Download files from OpenAI container and save to output directory
 
         Args:
-            file_annotations: List of file metadata from response
+            files: List of FileListResponse objects from container
+            container_id: Container ID where files are stored
             output_dir: Directory to save files to
             emit: Callback for progress updates
 
@@ -269,11 +296,10 @@ class MakerAgent(BaseAgent):
         """
         downloaded_files = []
 
-        for file_info in file_annotations:
+        for file in files:
             try:
-                file_id = file_info["file_id"]
-                filename = file_info["filename"]
-                container_id = file_info["container_id"]
+                file_id = file.id
+                filename = Path(file.path).name
 
                 emit({
                     "event": "log",
@@ -282,7 +308,10 @@ class MakerAgent(BaseAgent):
                 })
 
                 # Download file content from OpenAI
-                file_content = self.client.files.content(file_id)
+                file_content = self.client.containers.files.content.retrieve(file_id=file_id, container_id=container_id)
+
+                if file_content is None:
+                    raise ValueError(f"Failed to retrieve content for file {file_id}")
 
                 # Save to output directory
                 output_path = output_dir / filename
@@ -293,11 +322,13 @@ class MakerAgent(BaseAgent):
                 self.logger.info(f"✓ Downloaded: {filename} -> {output_path}")
 
             except Exception as e:
-                self.logger.error(f"Failed to download {filename}: {e}")
+                # Use safe filename access since it might not be defined if error occurs early
+                safe_filename = filename if 'filename' in locals() else f"file_{getattr(file, 'id', 'unknown')}"
+                self.logger.error(f"Failed to download {safe_filename}: {e}")
                 emit({
                     "event": "log",
                     "step": self.step_name,
-                    "message": f"⚠ Failed to download {filename}: {str(e)}"
+                    "message": f"⚠ Failed to download {safe_filename}: {str(e)}"
                 })
 
         return downloaded_files

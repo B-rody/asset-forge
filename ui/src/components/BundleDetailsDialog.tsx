@@ -16,15 +16,23 @@ interface BundleDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onGenerateAssets?: (bundleId: string) => void;
+  onPackageBundle?: (bundleId: string) => void;
 }
 
-export function BundleDetailsDialog({ bundle, open, onOpenChange, onGenerateAssets }: BundleDetailsDialogProps) {
+export function BundleDetailsDialog({ bundle, open, onOpenChange, onGenerateAssets, onPackageBundle }: BundleDetailsDialogProps) {
   if (!open) return null;
 
   const handleGenerateAssets = () => {
     if (onGenerateAssets) {
       onGenerateAssets(bundle.bundle_id);
       onOpenChange(false); // Close dialog after starting generation
+    }
+  };
+
+  const handlePackageBundle = () => {
+    if (onPackageBundle) {
+      onPackageBundle(bundle.bundle_id);
+      onOpenChange(false); // Close dialog after starting packaging
     }
   };
 
@@ -53,8 +61,11 @@ export function BundleDetailsDialog({ bundle, open, onOpenChange, onGenerateAsse
   const statusColor = statusColors[bundle.status as keyof typeof statusColors] || statusColors.pending;
   const statusIcon = statusIcons[bundle.status as keyof typeof statusIcons] || statusIcons.pending;
 
-  // Can generate assets if status is completed and current step is planner
+  // Can generate assets if planner completed
   const canGenerateAssets = bundle.status === 'completed' && bundle.current_step === 'planner';
+
+  // Can package bundle if maker completed
+  const canPackage = bundle.status === 'completed' && bundle.current_step === 'maker';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => onOpenChange(false)}>
@@ -268,10 +279,12 @@ export function BundleDetailsDialog({ bundle, open, onOpenChange, onGenerateAsse
           >
             Close
           </button>
+
+          {/* Action buttons */}
           {onGenerateAssets && canGenerateAssets && (
             <button
               onClick={handleGenerateAssets}
-              className="px-4 py-2 text-sm font-medium rounded-md bg-primary text-white hover:bg-primary/80 transition-all hover:shadow-md flex items-center gap-2"
+              className="px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-all hover:shadow-md flex items-center gap-2"
             >
               <Sparkles className="h-4 w-4" />
               <div className="flex flex-col items-start">
@@ -280,6 +293,20 @@ export function BundleDetailsDialog({ bundle, open, onOpenChange, onGenerateAsse
               </div>
             </button>
           )}
+
+          {onPackageBundle && canPackage && (
+            <button
+              onClick={handlePackageBundle}
+              className="px-4 py-2 text-sm font-medium rounded-md bg-orange-600 text-white hover:bg-orange-700 transition-all hover:shadow-md flex items-center gap-2"
+            >
+              <Package className="h-4 w-4" />
+              <div className="flex flex-col items-start">
+                <span>Package Bundle</span>
+                <span className="text-xs font-normal text-white/90">Create final deliverable package</span>
+              </div>
+            </button>
+          )}
+
           {bundle.status === 'failed' && (
             <div className="text-xs text-muted-foreground">
               This bundle cannot be processed due to errors

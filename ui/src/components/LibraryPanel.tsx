@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { Database, Lightbulb, Package } from "lucide-react";
+import { Database, Lightbulb, Package, Sparkles } from "lucide-react";
 import { ipcClient } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
 import { IdeasView } from "./IdeasView";
 import { BundlesView } from "./BundlesView";
 
-type LibraryTab = "ideas" | "bundles";
+type LibraryTab = "ideas" | "ready" | "generated";
 
 interface LibraryStats {
   ideas_count: number;
@@ -15,9 +15,10 @@ interface LibraryStats {
 interface LibraryPanelProps {
   onBuildBundle?: (ideaId: string) => void;
   onGenerateAssets?: (bundleId: string) => void;
+  onPackageBundle?: (bundleId: string) => void;
 }
 
-export function LibraryPanel({ onBuildBundle, onGenerateAssets }: LibraryPanelProps) {
+export function LibraryPanel({ onBuildBundle, onGenerateAssets, onPackageBundle }: LibraryPanelProps) {
   const [activeTab, setActiveTab] = useState<LibraryTab>("ideas");
   const [stats, setStats] = useState<LibraryStats>({ ideas_count: 0, bundles_count: 0 });
 
@@ -79,15 +80,26 @@ export function LibraryPanel({ onBuildBundle, onGenerateAssets }: LibraryPanelPr
             Ideas
           </button>
           <button
-            onClick={() => setActiveTab("bundles")}
+            onClick={() => setActiveTab("ready")}
             className={cn(
               "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-t-md transition-colors",
               "hover:bg-accent hover:text-accent-foreground",
-              activeTab === "bundles" && "bg-primary text-primary-foreground"
+              activeTab === "ready" && "bg-primary text-primary-foreground"
+            )}
+          >
+            <Sparkles className="h-4 w-4" />
+            Ready to Make
+          </button>
+          <button
+            onClick={() => setActiveTab("generated")}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-t-md transition-colors",
+              "hover:bg-accent hover:text-accent-foreground",
+              activeTab === "generated" && "bg-primary text-primary-foreground"
             )}
           >
             <Package className="h-4 w-4" />
-            Bundles
+            Ready to Package
           </button>
         </div>
       </div>
@@ -95,7 +107,20 @@ export function LibraryPanel({ onBuildBundle, onGenerateAssets }: LibraryPanelPr
       {/* Content */}
       <div>
         {activeTab === "ideas" && <IdeasView onBuildBundle={onBuildBundle} />}
-        {activeTab === "bundles" && <BundlesView onGenerateAssets={onGenerateAssets} />}
+        {activeTab === "ready" && (
+          <BundlesView
+            fetchCommand="get_ready_bundles"
+            eventName="ready_bundles_list"
+            onGenerateAssets={onGenerateAssets}
+          />
+        )}
+        {activeTab === "generated" && (
+          <BundlesView
+            fetchCommand="get_generated_bundles"
+            eventName="generated_bundles_list"
+            onPackageBundle={onPackageBundle}
+          />
+        )}
       </div>
     </div>
   );

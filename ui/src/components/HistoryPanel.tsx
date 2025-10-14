@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { History, Search, Package } from "lucide-react";
+import { History, Activity, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ActivityView } from "./ActivityView";
+import { ActivityLogView } from "./ActivityLogView";
 import { CompletedView } from "./CompletedView";
 
 type HistoryTab = "activity" | "completed";
@@ -22,7 +22,7 @@ export function HistoryPanel({ onOpenFolder }: HistoryPanelProps) {
           <div>
             <h2 className="text-lg md:text-xl font-semibold">History</h2>
             <p className="text-sm text-muted-foreground/90">
-              Audit trail of research sessions and completed bundles
+              Pipeline activity logs and completed bundles ready to sell
             </p>
           </div>
         </div>
@@ -48,7 +48,7 @@ export function HistoryPanel({ onOpenFolder }: HistoryPanelProps) {
               activeTab === "activity" && "bg-primary text-primary-foreground"
             )}
           >
-            <Search className="h-4 w-4" />
+            <Activity className="h-4 w-4" />
             Activity
           </button>
         </div>
@@ -57,7 +57,7 @@ export function HistoryPanel({ onOpenFolder }: HistoryPanelProps) {
       {/* Content */}
       <div>
         {activeTab === "completed" && <CompletedView onOpenFolder={onOpenFolder} />}
-        {activeTab === "activity" && <ActivityView />}
+        {activeTab === "activity" && <ActivityLogView />}
       </div>
     </div>
   );

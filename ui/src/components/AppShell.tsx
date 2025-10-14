@@ -232,9 +232,25 @@ export function AppShell() {
     setActiveTab("one-click");
 
     // Send IPC command to generate assets from bundle
-    // TODO: Backend needs to implement this command
     ipcClient.sendCommand({
       cmd: "generate_assets_from_bundle",
+      params: { bundle_id: bundleId }
+    });
+  };
+
+  const handlePackageBundle = (bundleId: string) => {
+    // Reset state for new pipeline run - only show Packager step
+    handleRunStart([
+      { name: "Packager", status: "pending" },
+    ]);
+    setRunningMode("auto");
+
+    // Switch to Generate tab to show pipeline progress
+    setActiveTab("one-click");
+
+    // Send IPC command to package bundle
+    ipcClient.sendCommand({
+      cmd: "package_bundle",
       params: { bundle_id: bundleId }
     });
   };
@@ -272,6 +288,7 @@ export function AppShell() {
               <LibraryPanel
                 onBuildBundle={handleCreatePlanFromIdea}
                 onGenerateAssets={handleGenerateAssets}
+                onPackageBundle={handlePackageBundle}
               />
             ) : activeTab === "history" ? (
               <HistoryPanel onOpenFolder={handleOpenFolder} />

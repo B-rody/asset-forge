@@ -8,7 +8,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from app.database.db import DatabaseManager
 from app.database.models import (
-    Idea, Bundle, MakerOutput, UsedIdea, CreatedBundle, ResearchSession
+    Idea, Bundle, MakerOutput, UsedIdea, CreatedBundle, ResearchSession, ActivityLog
 )
 from app.logger import setup_logger
 
@@ -350,6 +350,14 @@ class BundleQueries:
             logger.error(f"Failed to fetch bundles: {e}", exc_info=True)
             return []
 
+    def get_ready_for_maker(self, limit: int = 100) -> List[Bundle]:
+        """Fetch bundles ready for maker (planner completed)"""
+        return self.get_by_step_and_status("planner", "completed")
+
+    def get_ready_for_packager(self, limit: int = 100) -> List[Bundle]:
+        """Fetch bundles ready for packager (maker completed)"""
+        return self.get_by_step_and_status("maker", "completed")
+
     def delete(self, bundle_id: str) -> bool:
         """Delete bundle (used when moving to created_bundles)"""
         try:
@@ -639,3 +647,157 @@ class CreatedBundleQueries:
         except sqlite3.Error as e:
             logger.error(f"Failed to get created bundle stats: {e}", exc_info=True)
             return {"total": 0, "by_niche": {}}
+
+
+class ActivityLogQueries:
+    """Query operations for activity_log table (pipeline activity tracking)"""
+
+    def __init__(self, db_manager: DatabaseManager):
+        self.db = db_manager
+
+    def create(self, activity: ActivityLog) -> bool:
+        """Insert new activity log entry"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                INSERT INTO activity_log (
+                    activity_id, activity_type, bundle_id, idea_id,
+                    started_at, completed_at, status, duration_seconds,
+                    error_message, metadata_json
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                activity.activity_id, activity.activity_type, activity.bundle_id, activity.idea_id,
+                activity.started_at, activity.completed_at, activity.status, activity.duration_seconds,
+                activity.error_message, activity.metadata_json
+            ))
+
+            conn.commit()
+            logger.info(f"Created activity log: {activity.activity_id} ({activity.activity_type})")
+            return True
+
+        except sqlite3.IntegrityError:
+            logger.warning(f"Activity log already exists: {activity.activity_id}")
+            return False
+        except sqlite3.Error as e:
+            logger.error(f"Failed to create activity log: {e}", exc_info=True)
+            return False
+
+    def update_completion(
+        self,
+        activity_id: str,
+        status: str,
+        error_message: Optional[str] = None
+    ) -> bool:
+        """Update activity completion status"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            # Get the start time to calculate duration
+            cursor.execute("SELECT started_at FROM activity_log WHERE activity_id = ?", (activity_id,))
+            row = cursor.fetchone()
+
+            if not row:
+                logger.warning(f"Activity not found for update: {activity_id}")
+                return False
+
+            started_at = datetime.fromisoformat(row["started_at"])
+            completed_at = datetime.now()
+            duration_seconds = int((completed_at - started_at).total_seconds())
+
+            cursor.execute("""
+                UPDATE activity_log
+                SET status = ?, completed_at = ?, duration_seconds = ?, error_message = ?
+                WHERE activity_id = ?
+            """, (status, completed_at.isoformat(), duration_seconds, error_message, activity_id))
+
+            conn.commit()
+            logger.info(f"Updated activity log: {activity_id} -> {status} ({duration_seconds}s)")
+            return cursor.rowcount > 0
+
+        except sqlite3.Error as e:
+            logger.error(f"Failed to update activity log: {e}", exc_info=True)
+            return False
+
+    def get_all(self, limit: int = 100) -> List[ActivityLog]:
+        """Fetch all activity logs (most recent first)"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT * FROM activity_log
+                ORDER BY started_at DESC
+                LIMIT ?
+            """, (limit,))
+
+            rows = cursor.fetchall()
+            return [ActivityLog(**dict(row)) for row in rows]
+
+        except sqlite3.Error as e:
+            logger.error(f"Failed to fetch activity logs: {e}", exc_info=True)
+            return []
+
+    def get_by_type(self, activity_type: str, limit: int = 100) -> List[ActivityLog]:
+        """Fetch activity logs by type"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT * FROM activity_log
+                WHERE activity_type = ?
+                ORDER BY started_at DESC
+                LIMIT ?
+            """, (activity_type, limit))
+
+            rows = cursor.fetchall()
+            return [ActivityLog(**dict(row)) for row in rows]
+
+        except sqlite3.Error as e:
+            logger.error(f"Failed to fetch activity logs by type: {e}", exc_info=True)
+            return []
+
+    def get_by_bundle(self, bundle_id: str) -> List[ActivityLog]:
+        """Fetch all activity logs for a specific bundle"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT * FROM activity_log
+                WHERE bundle_id = ?
+                ORDER BY started_at ASC
+            """, (bundle_id,))
+
+            rows = cursor.fetchall()
+            return [ActivityLog(**dict(row)) for row in rows]
+
+        except sqlite3.Error as e:
+            logger.error(f"Failed to fetch activity logs for bundle: {e}", exc_info=True)
+            return []
+
+    def get_recent_activity(self, days: int = 30, limit: int = 100) -> List[ActivityLog]:
+        """Get recent pipeline activities"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            cutoff_date = (datetime.now() - timedelta(days=days)).isoformat()
+
+            cursor.execute("""
+                SELECT * FROM activity_log
+                WHERE started_at > ?
+                ORDER BY started_at DESC
+                LIMIT ?
+            """, (cutoff_date, limit))
+
+            rows = cursor.fetchall()
+            return [ActivityLog(**dict(row)) for row in rows]
+
+        except sqlite3.Error as e:
+            logger.error(f"Failed to fetch recent activity: {e}", exc_info=True)
+            return []

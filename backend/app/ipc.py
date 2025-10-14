@@ -85,6 +85,19 @@ class IPCServer:
 
             await self.orchestrator.run_maker_from_bundle(bundle_id, self.emit_event)
 
+        elif cmd == "package_bundle":
+            params = command.get("params", {})
+            bundle_id = params.get("bundle_id")
+
+            if not bundle_id:
+                self.emit_error(None, "No bundle_id provided")
+                return
+
+            # Use real orchestrator for packaging
+            self._set_orchestrator(False)
+
+            await self.orchestrator.run_packager_from_bundle(bundle_id, self.emit_event)
+
         elif cmd == "re_run_step":
             params = command.get("params", {})
             bundle_id = params.get("bundle_id")
@@ -298,6 +311,84 @@ class IPCServer:
             except Exception as e:
                 logger.error(f"Failed to get bundles: {e}", exc_info=True)
                 self.emit_error(None, f"Failed to retrieve bundles: {str(e)}")
+
+        elif cmd == "get_ready_bundles":
+            try:
+                logger.info("Handling get_ready_bundles command")
+
+                # Ensure orchestrator is initialized
+                self._set_orchestrator(False)
+
+                params = command.get("params", {})
+                limit = params.get("limit", 100)
+
+                from app.database.queries import BundleQueries
+                bundle_queries = BundleQueries(self.orchestrator.db_manager)
+                bundles = bundle_queries.get_ready_for_maker(limit=limit)
+                logger.info(f"Retrieved {len(bundles)} ready bundles from database")
+
+                self.emit_event({
+                    "event": "ready_bundles_list",
+                    "bundles": [bundle.model_dump() for bundle in bundles],
+                    "total": len(bundles)
+                })
+                logger.info(f"Emitted ready_bundles_list event with {len(bundles)} bundles")
+
+            except Exception as e:
+                logger.error(f"Failed to get ready bundles: {e}", exc_info=True)
+                self.emit_error(None, f"Failed to retrieve ready bundles: {str(e)}")
+
+        elif cmd == "get_generated_bundles":
+            try:
+                logger.info("Handling get_generated_bundles command")
+
+                # Ensure orchestrator is initialized
+                self._set_orchestrator(False)
+
+                params = command.get("params", {})
+                limit = params.get("limit", 100)
+
+                from app.database.queries import BundleQueries
+                bundle_queries = BundleQueries(self.orchestrator.db_manager)
+                bundles = bundle_queries.get_ready_for_packager(limit=limit)
+                logger.info(f"Retrieved {len(bundles)} generated bundles from database")
+
+                self.emit_event({
+                    "event": "generated_bundles_list",
+                    "bundles": [bundle.model_dump() for bundle in bundles],
+                    "total": len(bundles)
+                })
+                logger.info(f"Emitted generated_bundles_list event with {len(bundles)} bundles")
+
+            except Exception as e:
+                logger.error(f"Failed to get generated bundles: {e}", exc_info=True)
+                self.emit_error(None, f"Failed to retrieve generated bundles: {str(e)}")
+
+        elif cmd == "get_activity_log":
+            try:
+                logger.info("Handling get_activity_log command")
+
+                # Ensure orchestrator is initialized
+                self._set_orchestrator(False)
+
+                params = command.get("params", {})
+                limit = params.get("limit", 100)
+
+                from app.database.queries import ActivityLogQueries
+                activity_queries = ActivityLogQueries(self.orchestrator.db_manager)
+                activities = activity_queries.get_all(limit=limit)
+                logger.info(f"Retrieved {len(activities)} activity logs from database")
+
+                self.emit_event({
+                    "event": "activity_log_list",
+                    "activities": [activity.model_dump() for activity in activities],
+                    "total": len(activities)
+                })
+                logger.info(f"Emitted activity_log_list event with {len(activities)} activities")
+
+            except Exception as e:
+                logger.error(f"Failed to get activity log: {e}", exc_info=True)
+                self.emit_error(None, f"Failed to retrieve activity log: {str(e)}")
 
         elif cmd == "get_library_stats":
             try:

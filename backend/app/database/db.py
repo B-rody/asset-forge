@@ -191,6 +191,37 @@ class DatabaseManager:
                 ON research_sessions(created_at DESC)
             """)
 
+            # Activity log (tracks all pipeline activities)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS activity_log (
+                    activity_id TEXT PRIMARY KEY,
+                    activity_type TEXT NOT NULL,
+                    bundle_id TEXT,
+                    idea_id TEXT,
+                    started_at TEXT NOT NULL,
+                    completed_at TEXT,
+                    status TEXT NOT NULL,
+                    duration_seconds INTEGER,
+                    error_message TEXT,
+                    metadata_json TEXT
+                )
+            """)
+
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_activity_type
+                ON activity_log(activity_type, completed_at DESC)
+            """)
+
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_activity_bundle
+                ON activity_log(bundle_id)
+            """)
+
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_activity_completed
+                ON activity_log(completed_at DESC)
+            """)
+
             conn.commit()
             logger.info(f"Database initialized at {self.db_path}")
 

@@ -1,0 +1,303 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://example.com/schemas/maker.v1_0.schema.json",
+  "title": "Maker Output (v1.0)",
+  "description": "Output schema for Maker agent that creates digital product assets. MUST include container_id and file_ids for all files created in code_interpreter.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "asset_id",
+    "bundle_id",
+    "status",
+    "container_id",
+    "file_ids",
+    "files_created",
+    "generation_metadata",
+    "qa_validation"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^maker\\.v\\d+\\.\\d+$",
+      "description": "Schema version identifier (e.g., 'maker.v1.0')."
+    },
+    "asset_id": {
+      "type": "string",
+      "pattern": "^asset-[0-9]{3}$",
+      "description": "The asset identifier for the created asset (e.g., 'asset-001')."
+    },
+    "bundle_id": {
+      "type": "string",
+      "minLength": 5,
+      "description": "The bundle identifier this asset belongs to."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["success", "partial_success", "failed"],
+      "description": "Overall status of asset generation. 'success' = all files created, 'partial_success' = some files created, 'failed' = no files created."
+    },
+    "container_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "REQUIRED: The container ID where files were created and stored. This is the code_interpreter container ID from OpenAI."
+    },
+    "file_ids": {
+      "type": "array",
+      "minItems": 0,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "REQUIRED: Array of OpenAI file IDs for all files created in the container. Each file_id corresponds to a file in files_created array. Empty array if no files were created."
+    },
+    "files_created": {
+      "type": "array",
+      "minItems": 0,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["file_id", "filename", "format", "file_size_bytes"],
+        "properties": {
+          "file_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "OpenAI file ID for this specific file (must match an entry in file_ids array)."
+          },
+          "filename": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Full filename including extension (e.g., 'asset-001_weekly-tracker.pdf')."
+          },
+          "format": {
+            "type": "string",
+            "enum": ["PDF", "PNG", "JPG", "SVG", "DOCX", "XLSX", "TXT", "MD", "CSV", "HTML", "NOTION"],
+            "description": "File format/extension."
+          },
+          "file_size_bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "File size in bytes."
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Brief description of what this file contains."
+          }
+        }
+      },
+      "description": "Detailed metadata for each file created. Must contain one entry per file_id."
+    },
+    "generation_metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["started_at", "completed_at", "generation_time_seconds"],
+      "properties": {
+        "started_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when asset generation started."
+        },
+        "completed_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when asset generation completed."
+        },
+        "generation_time_seconds": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Total time taken to generate asset in seconds."
+        },
+        "model_used": {
+          "type": "string",
+          "description": "OpenAI model used for generation (e.g., 'gpt-5', 'gpt-5-mini')."
+        },
+        "tools_used": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of tools used (e.g., ['code_interpreter', 'web_search'])."
+        }
+      },
+      "description": "Metadata about the generation process."
+    },
+    "qa_validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passed", "overall_score", "checks_performed"],
+      "properties": {
+        "passed": {
+          "type": "boolean",
+          "description": "Whether asset passed all QA validation checks."
+        },
+        "overall_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Overall quality score from 0.0 to 1.0 (0.0 = failed all checks, 1.0 = perfect)."
+        },
+        "checks_performed": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["completeness", "quality", "format_technical", "layout_spacing"],
+          "properties": {
+            "completeness": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["passed", "score", "details"],
+              "properties": {
+                "passed": {
+                  "type": "boolean"
+                },
+                "score": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "details": {
+                  "type": "string",
+                  "maxLength": 500,
+                  "description": "Brief explanation of completeness check results."
+                }
+              }
+            },
+            "quality": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["passed", "score", "details"],
+              "properties": {
+                "passed": {
+                  "type": "boolean"
+                },
+                "score": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "details": {
+                  "type": "string",
+                  "maxLength": 500,
+                  "description": "Brief explanation of quality check results."
+                }
+              }
+            },
+            "format_technical": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["passed", "score", "details"],
+              "properties": {
+                "passed": {
+                  "type": "boolean"
+                },
+                "score": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "details": {
+                  "type": "string",
+                  "maxLength": 500,
+                  "description": "Brief explanation of format/technical check results."
+                }
+              }
+            },
+            "layout_spacing": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["passed", "score", "details"],
+              "properties": {
+                "passed": {
+                  "type": "boolean"
+                },
+                "score": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "details": {
+                  "type": "string",
+                  "maxLength": 500,
+                  "description": "Brief explanation of layout/spacing check results (PDF/DOCX only)."
+                }
+              }
+            }
+          },
+          "description": "Results from each QA check category."
+        },
+        "issues_found": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["severity", "category", "description"],
+            "properties": {
+              "severity": {
+                "type": "string",
+                "enum": ["critical", "warning", "info"],
+                "description": "Severity level of the issue."
+              },
+              "category": {
+                "type": "string",
+                "enum": ["completeness", "quality", "format", "layout", "content", "accessibility"],
+                "description": "Category of the issue."
+              },
+              "description": {
+                "type": "string",
+                "minLength": 10,
+                "maxLength": 300,
+                "description": "Description of the issue found."
+              },
+              "corrected": {
+                "type": "boolean",
+                "description": "Whether the issue was corrected before finalizing."
+              }
+            }
+          },
+          "description": "List of any issues found during QA validation."
+        }
+      },
+      "description": "QA validation results for the generated asset."
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["error_type", "message"],
+        "properties": {
+          "error_type": {
+            "type": "string",
+            "enum": ["generation_failed", "file_creation_failed", "validation_failed", "format_error", "tool_error", "unknown"],
+            "description": "Type of error encountered."
+          },
+          "message": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 500,
+            "description": "Detailed error message."
+          },
+          "file_affected": {
+            "type": "string",
+            "description": "Filename affected by this error (if applicable)."
+          }
+        }
+      },
+      "description": "List of any errors encountered during generation. Empty if status is 'success'."
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 10,
+        "maxLength": 300
+      },
+      "description": "List of non-critical warnings (e.g., 'File size exceeds target by 20%')."
+    },
+    "notes": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Any additional notes or observations about the generation process."
+    }
+  }
+}

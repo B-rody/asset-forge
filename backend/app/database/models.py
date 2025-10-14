@@ -185,3 +185,34 @@ class ResearchSession(BaseModel):
                 "idea_count": 9
             }
         }
+
+
+class ActivityLog(BaseModel):
+    """Activity log for tracking all pipeline activities"""
+
+    activity_id: str = Field(..., description="Unique activity identifier")
+    activity_type: str = Field(..., description="Type: research, planner, maker, packager")
+    bundle_id: Optional[str] = Field(None, description="Associated bundle (nullable for research)")
+    idea_id: Optional[str] = Field(None, description="Associated idea (nullable)")
+    started_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    completed_at: Optional[str] = Field(None, description="When activity completed")
+    status: str = Field(..., description="Status: in_progress, completed, failed")
+    duration_seconds: Optional[int] = Field(None, description="Duration in seconds")
+    error_message: Optional[str] = Field(None, description="Error message if failed")
+    metadata_json: Optional[str] = Field(None, description="Activity-specific metadata")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "activity_id": "research-2025-10-13-001",
+                "activity_type": "research",
+                "bundle_id": None,
+                "idea_id": None,
+                "started_at": "2025-10-13T12:00:00",
+                "completed_at": "2025-10-13T12:05:30",
+                "status": "completed",
+                "duration_seconds": 330,
+                "error_message": None,
+                "metadata_json": "{\"idea_count\": 9}"
+            }
+        }

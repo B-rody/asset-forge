@@ -182,28 +182,38 @@ class BaseAgent(ABC):
             self.logger.error(f"Input file not found: {path}")
             raise
 
-    def _load_output_schema(self) -> Dict[str, Any]:
+    def _load_output_schema(self) -> Optional[Dict[str, Any]]:
         """
         Load output schema from schemas/{agent_name}.output.schema.json
 
+        If the schema file is missing or empty, returns None instead of raising.
+        This allows agents to operate without output schemas when appropriate
+        (e.g., maker agent generates files rather than structured JSON).
+
         Returns:
-            Dict[str, Any]: Parsed JSON schema
+            Optional[Dict[str, Any]]: Parsed JSON schema, or None if not available
 
         Raises:
-            FileNotFoundError: If schema file doesn't exist
-            json.JSONDecodeError: If schema file is not valid JSON
+            json.JSONDecodeError: If schema file exists but contains invalid JSON
         """
         filename = f"{self.agent_name}.output.schema.json"
         schema_path = Path(__file__).parent / "schemas" / filename
 
         try:
             with open(schema_path, "r", encoding="utf-8") as f:
-                schema = json.load(f)
+                content = f.read().strip()
+
+                # Handle empty file gracefully
+                if not content:
+                    self.logger.warning(f"Output schema file is empty: {filename} - schema validation disabled")
+                    return None
+
+                schema = json.loads(content)
             self.logger.debug(f"Loaded output schema from {filename}")
             return schema
         except FileNotFoundError:
-            self.logger.error(f"Schema file not found: {schema_path}")
-            raise
+            self.logger.warning(f"Schema file not found: {filename} - schema validation disabled")
+            return None
         except json.JSONDecodeError as e:
             self.logger.error(f"Malformed schema JSON in {schema_path}: {e}")
             raise
@@ -212,12 +222,21 @@ class BaseAgent(ABC):
         """
         Validate API response against agent's output schema.
 
+        If no output schema is loaded (self.output_schema is None), validation
+        is skipped and True is returned. This allows agents without schemas to
+        bypass validation.
+
         Args:
             response: API response data to validate
 
         Returns:
-            bool: True if validation passes, False otherwise
+            bool: True if validation passes (or no schema exists), False otherwise
         """
+        # Skip validation if no schema is loaded
+        if self.output_schema is None:
+            self.logger.debug(f"No output schema loaded for {self.agent_name} - skipping validation")
+            return True
+
         try:
             # Validate using the pre-loaded schema
             jsonschema.validate(response, self.output_schema)

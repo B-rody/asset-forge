@@ -161,8 +161,6 @@ fn spawn_python_backend(window: Window) -> Result<PythonBackend, String> {
         for line in reader.lines() {
             match line {
                 Ok(line) => {
-                    println!("[Python] {}", line); // Debug logging
-
                     // Parse JSON event
                     match serde_json::from_str::<Value>(&line) {
                         Ok(event) => {

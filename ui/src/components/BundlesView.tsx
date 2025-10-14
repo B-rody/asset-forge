@@ -19,10 +19,18 @@ type SortOption = "date_desc" | "date_asc" | "status";
 type FilterOption = "all" | "completed" | "failed" | "pending";
 
 interface BundlesViewProps {
+  fetchCommand?: string;  // Command to fetch bundles (defaults to "get_bundles")
+  eventName?: string;     // Event name to listen for (defaults to "bundles_list")
   onGenerateAssets?: (bundleId: string) => void;
+  onPackageBundle?: (bundleId: string) => void;
 }
 
-export function BundlesView({ onGenerateAssets }: BundlesViewProps = {}) {
+export function BundlesView({
+  fetchCommand = "get_bundles",
+  eventName = "bundles_list",
+  onGenerateAssets,
+  onPackageBundle
+}: BundlesViewProps) {
   const [bundles, setBundles] = useState<Bundle[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<SortOption>("date_desc");
@@ -31,16 +39,20 @@ export function BundlesView({ onGenerateAssets }: BundlesViewProps = {}) {
   useEffect(() => {
     // Fetch bundles on mount
     const unsubscribe = ipcClient.subscribe((event) => {
-      if (event.event === "bundles_list") {
+      // Listen for the specified event name
+      if (event.event === eventName ||
+          event.event === "bundles_list" ||
+          event.event === "ready_bundles_list" ||
+          event.event === "generated_bundles_list") {
         setBundles(event.bundles || []);
         setLoading(false);
       }
     });
 
-    ipcClient.sendCommand({ cmd: "get_bundles", params: { limit: 100 } });
+    ipcClient.sendCommand({ cmd: fetchCommand, params: { limit: 100 } });
 
     return unsubscribe;
-  }, []);
+  }, [fetchCommand, eventName]);
 
   // Filter bundles by status
   const filteredBundles = bundles.filter((bundle) => {
@@ -133,7 +145,12 @@ export function BundlesView({ onGenerateAssets }: BundlesViewProps = {}) {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {sortedBundles.map((bundle) => (
-            <BundleCard key={bundle.bundle_id} bundle={bundle} onGenerateAssets={onGenerateAssets} />
+            <BundleCard
+              key={bundle.bundle_id}
+              bundle={bundle}
+              onGenerateAssets={onGenerateAssets}
+              onPackageBundle={onPackageBundle}
+            />
           ))}
         </div>
       )}
