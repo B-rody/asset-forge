@@ -53,24 +53,31 @@ class MakerAgent(BaseAgent):
             total_assets = len(assets)
             emit({"event": "log", "step": self.step_name, "message": f"Generating {total_assets} asset(s)..."})
 
-            # Create output directory once
+            # Create base output directory
             from app.settings import settings
             bundle_dir = settings.get_bundle_dir(bundle_id)
-            output_dir = bundle_dir / "maker_output"
-            output_dir.mkdir(parents=True, exist_ok=True)
+            base_output_dir = bundle_dir / "maker_output"
+            base_output_dir.mkdir(parents=True, exist_ok=True)
 
             all_generated_files = []
 
             # Loop through each asset
             for idx, asset in enumerate(assets, 1):
                 asset_name = asset.get("name", f"asset-{idx}")
+                asset_id = asset.get("asset_id", f"asset-{idx:03d}")
+
+                # Create subdirectory for this asset
+                # Format: asset-001-weekly-planner
+                safe_asset_name = asset_name.replace(" ", "-").lower()
+                asset_dir = base_output_dir / f"{asset_id}-{safe_asset_name}"
+                asset_dir.mkdir(parents=True, exist_ok=True)
 
                 emit({
                     "event": "log",
                     "step": self.step_name,
                     "message": f"Creating asset {idx}/{total_assets}: {asset_name}..."
                 })
-                
+
                 container_name = f"{asset_name}-container-{idx:04d}"
 
                 container = self.client.containers.create(
@@ -88,7 +95,7 @@ class MakerAgent(BaseAgent):
 
                 # Call OpenAI API for single asset
                 response = self.client.responses.create(
-                    model="gpt-5-mini",
+                    model="gpt-5",
                     instructions=self.instructions,
                     input=asset_prompt,
                     tools=[
@@ -127,7 +134,7 @@ class MakerAgent(BaseAgent):
                         "step": self.step_name,
                         "message": f"Downloading {len(files_list)} file(s) for {asset_name}..."
                     })
-                    downloaded = self._download_files(files=files_list, container_id=container.id, output_dir=output_dir, emit=emit)
+                    downloaded = self._download_files(files=files_list, container_id=container.id, output_dir=asset_dir, emit=emit)
                     all_generated_files.extend(downloaded)
 
                 emit({

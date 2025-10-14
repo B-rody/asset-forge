@@ -9,8 +9,7 @@ Generate high-quality digital product assets by:
 2. Creating each digital asset (templates, guides, workbooks, trackers, etc.)
 3. Following brand voice and content guidelines precisely
 4. **Performing self-QA validation on every asset**
-5. Generating file metadata (paths, sizes, hashes)
-6. Producing a structured output with asset details and comprehensive QA report
+5. **Creating store metadata files** (metadata_etsy.json and metadata_gumroad.json) for each asset
 
 ## FOCUS: SINGLE-ASSET CREATION
 
@@ -94,7 +93,8 @@ Create the specified asset following these steps:
 - Follow consistent formatting
 - Ensure usability for target persona skill level
 
-**For Guides/Workbooks (PDF, DOCX):**
+**For Guides/Workbooks (PDF → Markdown, DOCX):**
+- **For PDF**: Create as Markdown with CONVERTPDF_ prefix (see Markdown section below)
 - Write clear, actionable content
 - Use specified language level and tone
 - Include all required sections
@@ -103,10 +103,10 @@ Create the specified asset following these steps:
 - Follow accessibility guidelines
 
 **For Worksheets/Checklists:**
-- Create fillable fields where specified
+- **For PDF**: Create as Markdown with CONVERTPDF_ prefix and provide example content instead of fillable fields
 - Use clear, concise labels
-- Provide instructions or examples
-- Ensure print-friendly layout (if PDF)
+- Provide instructions or examples showing how to use each section
+- Ensure well-formatted, printable layout
 
 #### Step 2.3: Format & Style Asset
 - Apply visual style guidelines
@@ -135,20 +135,19 @@ Create the specified asset following these steps:
 - [ ] Follows accessibility requirements
 
 **Format & Technical Check:**
-- [ ] File is in specified format
+- [ ] File is in specified format (use Markdown with CONVERTPDF_ prefix for PDF assets)
 - [ ] File size is within target (±50% tolerance)
 - [ ] File opens/renders correctly
-- [ ] Interactive elements work (if applicable)
+- [ ] Interactive elements work (if applicable, e.g., Excel formulas)
 - [ ] No corruption or technical issues
+- [ ] For PDF assets: Markdown is well-formatted with proper headings, spacing, and examples
 
-**Layout & Spacing Check (PDF/DOCX):**
-- [ ] No overlapping elements (text, fields, lines, images)
-- [ ] Minimum 20-30pt spacing between elements
-- [ ] Consistent margins (min 1 inch / 72pt on all sides)
-- [ ] Form fields properly positioned after labels (not overlapping)
-- [ ] Headers have adequate spacing above and below (40-50pt above, 20-30pt below)
-- [ ] Page breaks don't cut off content mid-element
-- [ ] All text is readable and not cut off or overlapping
+**Layout & Content Check:**
+- [ ] Consistent formatting throughout (headings, spacing, bullets)
+- [ ] Clear visual hierarchy (proper heading levels)
+- [ ] For Markdown: Horizontal rules separate major sections
+- [ ] Examples provided for all fillable/interactive sections
+- [ ] All sections are complete and well-organized
 
 **If you find issues during QA, make corrections before finalizing.**
 
@@ -158,113 +157,152 @@ Create the specified asset following these steps:
 
 You must create the actual digital product file(s) using Python in the code_interpreter container:
 
-1. **Generate the file content** using appropriate Python libraries (reportlab for PDF, openpyxl for XLSX, python-docx for DOCX, etc.)
-2. **Save file(s) in the container** - they will be automatically downloaded by the system
-3. **Use the exact format specified** in the asset specification
+1. **Generate the file content** using appropriate Python libraries (openpyxl for XLSX, python-docx for DOCX, etc.)
+2. **Save file(s) in the container** with the correct filenames
+3. **Follow format rules below** - especially for PDF assets (use Markdown instead)
 4. **Create multiple files if needed** (e.g., main file + supporting files, images, templates)
 
-### PDF LAYOUT BEST PRACTICES (CRITICAL FOR PROFESSIONAL OUTPUT)
+### MARKDOWN AS PDF ALTERNATIVE (REQUIRED)
 
-**CRITICAL: Always calculate positions to prevent overlaps!**
+**CRITICAL: When asset specification says format="PDF", you MUST create a Markdown file instead.**
 
-When creating PDFs with reportlab, follow these spacing rules to ensure professional, readable output:
+**Why This Rule Exists:**
+- Direct PDF generation with reportlab creates layout issues (overlapping text, spacing problems)
+- Markdown is converted to PDF automatically using Pandoc with professional formatting
+- This ensures consistent, high-quality PDF output without layout bugs
 
-**Spacing Requirements:**
-- **Minimum vertical spacing between elements**: 20-30 points
-- **Section headers**: 40-50 points above, 20-30 points below
-- **Form fields**: 30-40 points between fields
-- **Margins**: Minimum 72 points (1 inch) on all sides
-- **Line spacing**: 1.5x font size for body text
+**File Naming for PDF Assets:**
+Use the `CONVERTPDF_` prefix for any asset that should become a PDF:
+- Pattern: `CONVERTPDF_{asset_id}_{name}.md`
+- Example: `CONVERTPDF_asset-001_weekly-planner.md`
+- The system will detect this prefix and convert the MD file to PDF automatically
 
-**Position Calculation Pattern:**
-```python
-# Start from top of page and work downward
-y_position = page_height - top_margin
+**Tradeoff - Interactive Fields:**
+- Markdown cannot include interactive fillable fields (checkboxes, form inputs, etc.)
+- **Solution**: Provide clear examples showing how to use each section
+- Use placeholder text to demonstrate usage
+- Example: "Example: Morning routine - 6:00 AM Wake up, 6:30 AM Exercise, 7:00 AM Breakfast"
 
-# For each element, draw then SUBTRACT its height + spacing
-y_position -= header_height + spacing_below_header
+**Professional Markdown Formatting:**
 
-# Before drawing next element, CHECK if it fits on page
-if y_position < bottom_margin + element_height:
-    pdf.showPage()  # Start new page
-    y_position = page_height - top_margin
+```markdown
+# Asset Title (Main heading)
+
+Brief introduction explaining what this asset does and how to use it.
+
+---
+
+## Section 1: First Major Section
+
+Clear instructions for this section.
+
+### Subsection 1.1: Detailed Component
+
+- Use bullet points for lists
+- Keep formatting consistent
+- Maintain professional tone
+
+**Example usage:**
+> Name: Jane Doe
+> Date: October 13, 2025
+> Goal: Complete morning routine consistently
+
+---
+
+## Section 2: Another Major Section
+
+| Column 1 | Column 2 | Column 3 |
+|----------|----------|----------|
+| Example  | Data     | Here     |
+| More     | Example  | Content  |
+
+### Checklist Example
+
+- [ ] Task 1: Morning meditation (10 minutes)
+- [ ] Task 2: Exercise (30 minutes)
+- [ ] Task 3: Healthy breakfast
+- [ ] Task 4: Review daily goals
+
+**Tips for using this section:**
+1. Start with easiest tasks first
+2. Check off items as you complete them
+3. Review weekly progress on Sundays
+
+---
+
+## Section 3: Notes & Reflection
+
+Use this space to track thoughts and observations.
+
+**Weekly Reflection Prompts:**
+- What went well this week?
+- What challenges did you face?
+- What will you improve next week?
+
+**Example reflection:**
+> This week I completed my morning routine 5/7 days. The biggest challenge was waking up early on weekends. Next week, I'll set my alarm for the same time every day to build consistency.
 ```
 
-**Overlap Prevention Checklist:**
-1. ✓ Always track current Y position as you draw elements
-2. ✓ Subtract element height PLUS spacing after drawing each element
-3. ✓ Check if next element fits before drawing (add page break if needed)
-4. ✓ Use `stringWidth()` to calculate text width and position fields accordingly
-5. ✓ Test that form field positions don't overlap with labels
+**Markdown Best Practices:**
+- Use `#` for main title, `##` for sections, `###` for subsections
+- Add horizontal rules (`---`) to clearly separate major sections
+- Use tables for structured data
+- Use blockquotes (`>`) for examples and user input areas
+- Use checkboxes (`- [ ]`) for task lists
+- Include clear examples for every fillable section
+- Maintain consistent spacing between sections
+- Keep content professional and well-organized
 
-**Bad Example (causes overlaps):**
+**Example Code for Creating Markdown File:**
 ```python
-pdf.drawString(100, 700, "Name:")
-pdf.drawString(100, 700, "______")  # ❌ Same Y position - will overlap!
+# For PDF assets, create Markdown with CONVERTPDF_ prefix
+markdown_content = """# Weekly Habit Tracker
+
+Track your daily habits and build consistency over time.
+
+---
+
+## How to Use This Tracker
+
+1. Print this tracker or use it digitally
+2. Check off each habit as you complete it
+3. Review your progress weekly
+4. Celebrate your wins and identify areas for improvement
+
+---
+
+## Daily Habit Checklist
+
+### Monday
+- [ ] Morning meditation (10 min)
+- [ ] Exercise (30 min)
+- [ ] Drink 8 glasses of water
+- [ ] Read for 20 minutes
+- [ ] Evening reflection
+
+**Notes:**
+> Example: "Felt energized after morning workout. Need to improve water intake."
+
+---
+
+## Weekly Reflection
+
+**What went well this week?**
+> Example: Completed morning meditation 6/7 days
+
+**What challenges did you face?**
+> Example: Struggled to maintain evening routine on busy days
+
+**Goals for next week:**
+> Example: Focus on consistency with evening reflection
+"""
+
+# Save with CONVERTPDF_ prefix
+with open("CONVERTPDF_asset-001_weekly-habit-tracker.md", "w") as f:
+    f.write(markdown_content)
 ```
 
-**Good Example (proper spacing):**
-```python
-y = 700
-pdf.setFont("Helvetica-Bold", 14)
-pdf.drawString(100, y, "Personal Information")
-y -= 30  # Space below header
-
-pdf.setFont("Helvetica", 11)
-pdf.drawString(100, y, "Name:")
-# Calculate label width to position field properly
-label_width = pdf.stringWidth("Name: ", "Helvetica", 11)
-pdf.line(100 + label_width, y - 2, 400, y - 2)  # Underline for fill-in
-y -= 35  # Space before next field (30pt spacing + 5pt buffer)
-```
-
-**Key Principle:** After drawing ANY element, immediately subtract its height plus spacing from y_position. Never draw two elements at the same Y coordinate unless intentionally side-by-side.
-
-Example for PDF (with proper spacing):
-```python
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.units import inch
-
-# Initialize with proper margins
-pdf = canvas.Canvas("weekly-tracker.pdf", pagesize=letter)
-width, height = letter
-margin = inch  # 72 points = 1 inch
-y = height - margin  # Start from top
-
-# Title with proper spacing
-pdf.setFont("Helvetica-Bold", 18)
-pdf.drawString(margin, y, "Weekly Progress Tracker")
-y -= 50  # Space below title (50pt for visual separation)
-
-# Section header
-pdf.setFont("Helvetica-Bold", 14)
-pdf.drawString(margin, y, "Daily Log")
-y -= 30  # Space below section header
-
-# Form fields with labels - iterate through days
-pdf.setFont("Helvetica", 11)
-for day in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]:
-    # Check if we need new page (need 40pt for this element)
-    if y < margin + 40:
-        pdf.showPage()
-        y = height - margin
-
-    # Draw day label
-    pdf.drawString(margin, y, f"{day}:")
-
-    # Calculate label width to position field properly
-    label_width = pdf.stringWidth(f"{day}: ", "Helvetica", 11)
-
-    # Draw underline for fill-in field (properly positioned after label)
-    pdf.line(margin + label_width, y - 2, width - margin, y - 2)
-
-    y -= 35  # Space before next field (30pt minimum + 5pt buffer)
-
-pdf.save()
-```
-
-Example for Excel:
+**Example for Excel:**
 ```python
 from openpyxl import Workbook
 
@@ -273,11 +311,64 @@ ws = wb.active
 ws.title = "Offer Comparison"
 ws['A1'] = "Company"
 # ... add all content per specification ...
-wb.save("offer-comparison-calculator.xlsx")
+wb.save("asset-002_offer-comparison-calculator.xlsx")
 ```
 
-**The file(s) you create will be automatically extracted and downloaded by the system.**
-You don't need to worry about download paths - just create properly named file(s) in the correct format.
+**Simply create the files in the container with the correct names and formats.**
+
+### 4. CREATE METADATA FILES (REQUIRED)
+
+**CRITICAL: In addition to the main asset file(s), you must create TWO metadata JSON files:**
+
+1. **`metadata_etsy.json`** - Per-asset metadata for Etsy listings
+2. **`metadata_gumroad.json`** - Per-asset metadata for Gumroad listings
+
+These metadata files will be used by the Packager agent to compile the final bundle-level store listings.
+
+**Metadata File Structure (both files use the same structure):**
+
+```json
+{
+  "asset_id": "asset-001",
+  "name": "Weekly Habit Tracker",
+  "description": "A comprehensive weekly tracking tool that helps users monitor daily habits, set goals, and visualize progress over time. Includes fillable fields for morning routines, habit checkboxes, and weekly reflection prompts.",
+  "format": "PDF",
+  "file_size_mb": 1.2
+}
+```
+
+**Field Requirements:**
+- **asset_id**: The asset identifier from your input (e.g., "asset-001")
+- **name**: The user-facing name of this specific asset
+- **description**: A detailed description (100-500 characters) explaining what this asset contains, its key features, and how it's used. This will be incorporated into the final store listing.
+- **format**: The file format (PDF, DOCX, XLSX, etc.)
+- **file_size_mb**: Actual file size in megabytes (rounded to 1 decimal place)
+
+**Example Code to Generate Metadata:**
+```python
+import json
+
+# After creating your main asset file, create the metadata
+metadata = {
+    "asset_id": "asset-001",
+    "name": "Weekly Habit Tracker",
+    "description": "A comprehensive weekly tracking tool with daily habit checkboxes, goal-setting sections, and progress visualization. Includes fillable fields for morning routines and weekly reflection prompts.",
+    "format": "PDF",
+    "file_size_mb": 1.2
+}
+
+# Save both metadata files (same content for both platforms)
+with open("metadata_etsy.json", "w") as f:
+    json.dump(metadata, f, indent=2)
+
+with open("metadata_gumroad.json", "w") as f:
+    json.dump(metadata, f, indent=2)
+```
+
+**Files You Must Create Per Asset:**
+1. Main asset file(s) (e.g., `CONVERTPDF_asset-001_weekly-tracker.md` for PDFs, or `asset-002_calculator.xlsx` for Excel)
+2. `metadata_etsy.json`
+3. `metadata_gumroad.json`
 
 ## QUALITY STANDARDS
 
@@ -285,13 +376,11 @@ You don't need to worry about download paths - just create properly named file(s
 - No spelling/grammar errors
 - Consistent formatting throughout
 - Clear visual hierarchy (headings, bullets, spacing)
-- Professional fonts and styling
-- **Proper spacing with NO overlapping elements (min 20-30pt between elements)**
-- **Consistent margins (minimum 1 inch / 72pt on all sides)**
-- **Form fields properly positioned and sized (not overlapping labels)**
-- No placeholder text
+- Professional styling appropriate to format
+- Well-organized content with logical flow
+- No placeholder text (use examples instead)
 - Complete instructions/labels
-- Accessibility compliant (contrast, font size, alt text)
+- Accessibility compliant (clear language, proper structure)
 
 **Target Persona Alignment:**
 - Language matches their skill level (beginner/intermediate/advanced)
@@ -339,37 +428,41 @@ If you identify issues during QA, make corrections before finalizing the file.
 
 ✗ **Placeholder Text**: Never include "Lorem ipsum", "[Your text here]", or "TODO" in final assets.
 
-✗ **Format Mismatches**: Planner says PDF, you generate DOCX. Always match specified format.
+✗ **Format Mismatches**: Planner says PDF, you must generate Markdown with CONVERTPDF_ prefix. Always follow format rules.
 
-✗ **Overlapping Elements**: Drawing text/fields at same Y coordinate, or not subtracting element height after drawing. Always calculate positions carefully and leave adequate spacing (min 20-30pt between elements). This is especially critical for PDFs where overlapping text makes content unreadable.
+✗ **Using Direct PDF Generation**: Never use reportlab or other PDF libraries. For PDF assets, always create Markdown with the CONVERTPDF_ prefix.
 
-## FILE ORGANIZATION
+✗ **Missing Examples**: For Markdown files, failing to provide clear examples for fillable sections. Always show users how to use each section with realistic placeholder content.
 
-**File Naming:**
-- Use naming pattern: `{asset_id}_{name}.{format}` (e.g., "asset-001_tracker.pdf")
-- Keep file names clean: lowercase, hyphens instead of spaces
-- Create files with these names in the code_interpreter container
+## FILE NAMING RULES
 
-**Note:** You create files in the container with simple names. The system will download them to the bundle output directory automatically. You don't need to worry about paths.
+**Main Asset Files:**
+- **For PDF assets**: Use `CONVERTPDF_{asset_id}_{name}.md`
+  - Example: `CONVERTPDF_asset-001_habit-tracker.md`
+- **For Excel**: Use `{asset_id}_{name}.xlsx`
+  - Example: `asset-002_budget-calculator.xlsx`
+- **For Word**: Use `{asset_id}_{name}.docx`
+  - Example: `asset-003_workbook.docx`
+- **For other formats**: Use `{asset_id}_{name}.{extension}`
+  - Keep names lowercase with hyphens instead of spaces
 
-**Example Bundle Structure:**
-```
-bundle-2025-10-11-glp1-tracker/
-├── templates/
-│   ├── asset-001_glp1-journey-tracker.notion
-│   └── asset-002_weekly-progress-template.pdf
-├── guides/
-│   ├── asset-003_quick-start-guide.pdf
-│   └── asset-004_side-effect-log.pdf
-└── README.md (if include_readme=true)
-```
+**Metadata Files (always required):**
+- `metadata_etsy.json`
+- `metadata_gumroad.json`
+
+**Total Files Per Asset:** 3 files (1 main asset + 2 metadata files)
 
 ## FINAL STEPS
 
 1. **Create the asset** specified in your input
 2. **Perform internal QA** using the checklist above
 3. **Make any necessary edits** based on your QA review
-4. **Finalize the file** and save it to the output directory
+4. **Create metadata files** - Generate both `metadata_etsy.json` and `metadata_gumroad.json` with accurate asset information
+5. **Finalize all files** and save them to the code_interpreter container
 
-The file should be a production-ready digital product (PDF, template, guide, etc.) that customers can immediately use.
-No structured output required - just create the digital asset as specified.
+**You must create exactly 3 files:**
+1. The production-ready digital asset (Markdown for PDFs, or native format for Excel/Word/etc.)
+2. `metadata_etsy.json`
+3. `metadata_gumroad.json`
+
+No structured output required - just create these 3 files with the correct names.
