@@ -135,6 +135,25 @@ class BaseAgent(ABC):
             self._created_bundle_queries = CreatedBundleQueries(self.db_manager)
         return self._created_bundle_queries
 
+    def _get_resource_base_dir(self) -> Path:
+        """
+        Get base directory for agent resource files based on agent name.
+
+        Asset-specific agents (prefixed with "asset_") have their resources in
+        the asset_agents/ subfolder. Other agents have resources in the parent directory.
+
+        Returns:
+            Path: Base directory where prompts/ and schemas/ folders are located
+        """
+        base = Path(__file__).parent
+
+        # Asset-specific agents are in asset_agents subfolder
+        if self.agent_name.startswith("asset_"):
+            return base / "asset_agents"
+
+        # Other agents (researcher, future ebook agents, etc.) are in parent directory
+        return base
+
     def _load_instructions(self) -> str:
         """
         Load agent instructions from prompts/instructions/{agent_name}.instructions.md
@@ -146,7 +165,7 @@ class BaseAgent(ABC):
             FileNotFoundError: If instructions file doesn't exist
         """
         filename = f"{self.agent_name}.instructions.md"
-        path = Path(__file__).parent / "prompts" / "instructions" / filename
+        path = self._get_resource_base_dir() / "prompts" / "instructions" / filename
 
         try:
             with open(path, "r", encoding="utf-8") as f:
@@ -171,7 +190,7 @@ class BaseAgent(ABC):
             FileNotFoundError: If input file doesn't exist
         """
         filename = f"{self.agent_name}.input.json"
-        path = Path(__file__).parent / "prompts" / "input" / filename
+        path = self._get_resource_base_dir() / "prompts" / "input" / filename
 
         try:
             with open(path, "r", encoding="utf-8") as f:
@@ -197,7 +216,7 @@ class BaseAgent(ABC):
             json.JSONDecodeError: If schema file exists but contains invalid JSON
         """
         filename = f"{self.agent_name}.output.schema.json"
-        schema_path = Path(__file__).parent / "schemas" / filename
+        schema_path = self._get_resource_base_dir() / "schemas" / filename
 
         try:
             with open(schema_path, "r", encoding="utf-8") as f:
