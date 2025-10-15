@@ -17,7 +17,7 @@ class PlannerAgent(BaseAgent):
 
     def __init__(self, db_manager: Optional["DatabaseManager"] = None):
         """Initialize PlannerAgent with base functionality"""
-        super().__init__("planner", db_manager=db_manager)
+        super().__init__("asset_planner", db_manager=db_manager)
 
     def execute(
         self,

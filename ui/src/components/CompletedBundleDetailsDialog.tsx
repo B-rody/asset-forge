@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { X, FolderOpen, Copy, CheckCircle2, FileText, DollarSign, Package } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { X, FolderOpen, Copy, CheckCircle2, FileText, DollarSign, Package, Trash2, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface CompletedBundleDetailsDialogProps {
@@ -18,10 +18,22 @@ interface CompletedBundleDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onOpenFolder?: (path: string) => void;
+  onDelete?: (bundleId: string) => Promise<void>;
 }
 
-export function CompletedBundleDetailsDialog({ bundle, open, onOpenChange, onOpenFolder }: CompletedBundleDetailsDialogProps) {
+export function CompletedBundleDetailsDialog({ bundle, open, onOpenChange, onOpenFolder, onDelete }: CompletedBundleDetailsDialogProps) {
   const [copied, setCopied] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // Reset state when dialog opens/closes
+  useEffect(() => {
+    if (open) {
+      setPendingDelete(false);
+      setDeleting(false);
+      setCopied(false);
+    }
+  }, [open]);
 
   if (!open) return null;
 
@@ -57,6 +69,24 @@ export function CompletedBundleDetailsDialog({ bundle, open, onOpenChange, onOpe
   const handleOpenFolder = () => {
     if (onOpenFolder) {
       onOpenFolder(bundle.output_path);
+    }
+  };
+
+  const handleDeleteClick = () => {
+    setPendingDelete(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (onDelete && pendingDelete) {
+      setDeleting(true);
+      try {
+        await onDelete(bundle.bundle_id);
+        onOpenChange(false); // Close dialog after successful deletion
+      } catch (error) {
+        console.error("Failed to delete completed bundle:", error);
+        setDeleting(false);
+        setPendingDelete(false);
+      }
     }
   };
 
@@ -202,20 +232,69 @@ export function CompletedBundleDetailsDialog({ bundle, open, onOpenChange, onOpe
         </div>
 
         {/* Footer */}
-        <div className="border-t border-border p-4 flex justify-between items-center">
-          <button
-            onClick={() => onOpenChange(false)}
-            className="px-4 py-2 text-sm font-medium rounded-md border border-border hover:bg-accent transition-colors"
-          >
-            Close
-          </button>
-          <button
-            onClick={handleOpenFolder}
-            className="px-4 py-2 text-sm font-medium rounded-md bg-primary text-white hover:bg-primary/80 transition-all hover:shadow-md flex items-center gap-2"
-          >
-            <FolderOpen className="h-4 w-4" />
-            Open Folder
-          </button>
+        <div className="border-t border-border p-4">
+          {/* Warning message when pending delete */}
+          {pendingDelete && (
+            <div className="mb-3 flex items-center gap-2 rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
+              <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+              <span>Are you sure you want to delete this completed bundle? This action cannot be undone.</span>
+            </div>
+          )}
+
+          <div className="flex justify-between items-center">
+            <div className="flex gap-2">
+              <button
+                onClick={() => onOpenChange(false)}
+                disabled={deleting}
+                className={cn(
+                  "px-4 py-2 text-sm font-medium rounded-md border border-border hover:bg-accent transition-colors",
+                  "disabled:pointer-events-none disabled:opacity-50"
+                )}
+              >
+                Close
+              </button>
+              {onDelete && !pendingDelete && (
+                <button
+                  onClick={handleDeleteClick}
+                  disabled={deleting}
+                  className={cn(
+                    "px-3 py-2 text-sm font-medium rounded-md border border-border hover:bg-destructive/10 hover:border-destructive transition-colors",
+                    "flex items-center gap-2 disabled:pointer-events-none disabled:opacity-50"
+                  )}
+                  title="Delete completed bundle"
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                  <span className="text-destructive">Delete</span>
+                </button>
+              )}
+              {onDelete && pendingDelete && (
+                <button
+                  onClick={handleConfirmDelete}
+                  disabled={deleting}
+                  className={cn(
+                    "px-4 py-2 text-sm font-medium rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors shadow",
+                    "flex items-center gap-2 disabled:pointer-events-none disabled:opacity-50"
+                  )}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {deleting ? "Deleting..." : "Confirm Delete"}
+                </button>
+              )}
+            </div>
+            {!pendingDelete && (
+              <button
+                onClick={handleOpenFolder}
+                disabled={deleting}
+                className={cn(
+                  "px-4 py-2 text-sm font-medium rounded-md bg-primary text-white hover:bg-primary/80 transition-all hover:shadow-md",
+                  "flex items-center gap-2 disabled:pointer-events-none disabled:opacity-50"
+                )}
+              >
+                <FolderOpen className="h-4 w-4" />
+                Open Folder
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

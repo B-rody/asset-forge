@@ -9,7 +9,7 @@ Generate high-quality digital product assets by:
 2. Creating each digital asset (templates, guides, workbooks, trackers, etc.)
 3. Following brand voice and content guidelines precisely
 4. **Performing self-QA validation on every asset**
-5. **Creating store metadata files** (metadata_etsy.json and metadata_gumroad.json) for each asset
+5. **Creating an asset metadata file** (asset_metadata.json) for each asset
 
 ## FOCUS: SINGLE-ASSET CREATION
 
@@ -316,16 +316,15 @@ wb.save("asset-002_offer-comparison-calculator.xlsx")
 
 **Simply create the files in the container with the correct names and formats.**
 
-### 4. CREATE METADATA FILES (REQUIRED)
+### 4. CREATE METADATA FILE (REQUIRED)
 
-**CRITICAL: In addition to the main asset file(s), you must create TWO metadata JSON files:**
+**CRITICAL: In addition to the main asset file(s), you must create ONE metadata JSON file:**
 
-1. **`metadata_etsy.json`** - Per-asset metadata for Etsy listings
-2. **`metadata_gumroad.json`** - Per-asset metadata for Gumroad listings
+**`asset_metadata.json`** - Per-asset metadata that describes this specific asset
 
-These metadata files will be used by the Packager agent to compile the final bundle-level store listings.
+This metadata file will be used by the Packager agent to compile the final bundle-level store listings.
 
-**Metadata File Structure (both files use the same structure):**
+**Metadata File Structure:**
 
 ```json
 {
@@ -357,18 +356,14 @@ metadata = {
     "file_size_mb": 1.2
 }
 
-# Save both metadata files (same content for both platforms)
-with open("metadata_etsy.json", "w") as f:
-    json.dump(metadata, f, indent=2)
-
-with open("metadata_gumroad.json", "w") as f:
+# Save the metadata file
+with open("asset_metadata.json", "w") as f:
     json.dump(metadata, f, indent=2)
 ```
 
 **Files You Must Create Per Asset:**
 1. Main asset file(s) (e.g., `CONVERTPDF_asset-001_weekly-tracker.md` for PDFs, or `asset-002_calculator.xlsx` for Excel)
-2. `metadata_etsy.json`
-3. `metadata_gumroad.json`
+2. `asset_metadata.json`
 
 ## QUALITY STANDARDS
 
@@ -446,23 +441,28 @@ If you identify issues during QA, make corrections before finalizing the file.
 - **For other formats**: Use `{asset_id}_{name}.{extension}`
   - Keep names lowercase with hyphens instead of spaces
 
-**Metadata Files (always required):**
-- `metadata_etsy.json`
-- `metadata_gumroad.json`
+**Metadata File (always required):**
+- `asset_metadata.json`
 
-**Total Files Per Asset:** 3 files (1 main asset + 2 metadata files)
+**Required Files Per Asset:**
+- **1 or more asset files** - Main digital product file(s) you create (templates, guides, images, etc.)
+- **1 metadata file (always required)** - `asset_metadata.json`
+
+You can create as many asset files as needed for the product (e.g., multiple templates in a Notion pack, multiple Excel sheets, supporting images, instruction PDFs, etc.)
 
 ## FINAL STEPS
 
 1. **Create the asset** specified in your input
 2. **Perform internal QA** using the checklist above
 3. **Make any necessary edits** based on your QA review
-4. **Create metadata files** - Generate both `metadata_etsy.json` and `metadata_gumroad.json` with accurate asset information
+4. **Create metadata file** - Generate `asset_metadata.json` with accurate asset information
 5. **Finalize all files** and save them to the code_interpreter container
 
-**You must create exactly 3 files:**
-1. The production-ready digital asset (Markdown for PDFs, or native format for Excel/Word/etc.)
-2. `metadata_etsy.json`
-3. `metadata_gumroad.json`
+**You must create:**
+1. **All necessary asset files** - Create as many files as needed to deliver a complete, professional product (templates, guides, worksheets, images, supporting documents, etc.)
+2. **One required metadata file** (always):
+   - `asset_metadata.json`
 
-No structured output required - just create these 3 files with the correct names.
+The only constraint is that you must include the metadata file. Everything else depends on what the product needs.
+
+No structured output required - just create all necessary files with the correct names.

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { Package, CheckCircle2, XCircle, Clock, ChevronRight, Sparkles } from "lucide-react";
+import { Package, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getDisplayStatus } from "@/lib/bundle-status";
 import { BundleDetailsDialog } from "./BundleDetailsDialog";
 
 interface BundleCardProps {
@@ -16,52 +17,10 @@ interface BundleCardProps {
   };
   onGenerateAssets?: (bundleId: string) => void;
   onPackageBundle?: (bundleId: string) => void;
+  onDelete?: (bundleId: string) => Promise<void>;
 }
 
-// Helper to determine display status based on workflow state
-function getDisplayStatus(current_step: string, status: string) {
-  if (status === "failed") {
-    return {
-      label: "Failed",
-      color: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800",
-      icon: <XCircle className="h-3 w-3" />
-    };
-  }
-
-  if (status === "pending") {
-    return {
-      label: "Pending",
-      color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800",
-      icon: <Clock className="h-3 w-3" />
-    };
-  }
-
-  // Completed states - distinguish by current_step
-  if (current_step === "planner" && status === "completed") {
-    return {
-      label: "Ready to Make",
-      color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800",
-      icon: <Sparkles className="h-3 w-3" />
-    };
-  }
-
-  if (current_step === "maker" && status === "completed") {
-    return {
-      label: "Ready to Package",
-      color: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200 dark:border-orange-800",
-      icon: <Package className="h-3 w-3" />
-    };
-  }
-
-  // Default fallback
-  return {
-    label: "In Progress",
-    color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800",
-    icon: <Clock className="h-3 w-3" />
-  };
-}
-
-export function BundleCard({ bundle, onGenerateAssets, onPackageBundle }: BundleCardProps) {
+export function BundleCard({ bundle, onGenerateAssets, onPackageBundle, onDelete }: BundleCardProps) {
   const [showDetails, setShowDetails] = useState(false);
 
   // Parse title from planner_output
@@ -115,8 +74,11 @@ export function BundleCard({ bundle, onGenerateAssets, onPackageBundle }: Bundle
           </span>
         </div>
 
-        {/* Step and Date */}
+        {/* Bundle ID, Step and Date */}
         <div className="mb-3">
+          <p className="text-xs text-muted-foreground">
+            {bundle.bundle_id}
+          </p>
           <p className="text-xs text-muted-foreground">
             Step: {bundle.current_step.charAt(0).toUpperCase() + bundle.current_step.slice(1)} • {formattedDate}
           </p>
@@ -143,6 +105,7 @@ export function BundleCard({ bundle, onGenerateAssets, onPackageBundle }: Bundle
         onOpenChange={setShowDetails}
         onGenerateAssets={onGenerateAssets}
         onPackageBundle={onPackageBundle}
+        onDelete={onDelete}
       />
     </>
   );

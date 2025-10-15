@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { Lightbulb, Filter, ArrowUpDown, Info } from "lucide-react";
+import { Lightbulb, Filter, ArrowUpDown, Info, CheckSquare, Trash2 } from "lucide-react";
 import { ipcClient } from "@/lib/ipc";
 import { IdeaCard } from "./IdeaCard";
+import { BulkDeleteDialog } from "./BulkDeleteDialog";
 import { cn } from "@/lib/utils";
 
 interface Idea {
@@ -28,13 +29,24 @@ export function IdeasView({ onBuildBundle }: IdeasViewProps = {}) {
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<SortOption>("roi_desc");
   const [filterPriority, setFilterPriority] = useState<FilterOption>("all");
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   useEffect(() => {
-    // Fetch ideas on mount
+    // Fetch ideas on mount and listen for deletion events
     const unsubscribe = ipcClient.subscribe((event) => {
       if (event.event === "ideas_list") {
         setIdeas(event.ideas || []);
         setLoading(false);
+      } else if (event.event === "idea_deleted" && event.success) {
+        // Remove deleted idea from list
+        setIdeas((prev) => prev.filter((idea) => idea.idea_id !== event.idea_id));
+        setSelectedIds((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(event.idea_id);
+          return newSet;
+        });
       }
     });
 
@@ -42,6 +54,61 @@ export function IdeasView({ onBuildBundle }: IdeasViewProps = {}) {
 
     return unsubscribe;
   }, []);
+
+  const toggleSelectionMode = () => {
+    setSelectionMode(!selectionMode);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelectIdea = (ideaId: string) => {
+    setSelectedIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(ideaId)) {
+        newSet.delete(ideaId);
+      } else {
+        newSet.add(ideaId);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAll = () => {
+    setSelectedIds(new Set(sortedIdeas.map((idea) => idea.idea_id)));
+  };
+
+  const deselectAll = () => {
+    setSelectedIds(new Set());
+  };
+
+  const handleBulkDelete = async () => {
+    // Delete each selected idea sequentially
+    for (const ideaId of selectedIds) {
+      try {
+        await ipcClient.sendCommand({
+          cmd: "delete_idea",
+          params: { idea_id: ideaId },
+        });
+      } catch (error) {
+        console.error(`Failed to delete idea ${ideaId}:`, error);
+      }
+    }
+
+    // Exit selection mode after deletion
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const handleSingleDelete = async (ideaId: string) => {
+    try {
+      await ipcClient.sendCommand({
+        cmd: "delete_idea",
+        params: { idea_id: ideaId },
+      });
+    } catch (error) {
+      console.error(`Failed to delete idea ${ideaId}:`, error);
+      throw error;
+    }
+  };
 
   // Filter ideas by priority
   const filteredIdeas = ideas.filter((idea) => {
@@ -144,9 +211,27 @@ export function IdeasView({ onBuildBundle }: IdeasViewProps = {}) {
           </div>
         </div>
 
+        {/* Selection Mode Button */}
+        <button
+          onClick={toggleSelectionMode}
+          className={cn(
+            "flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md border transition-colors",
+            selectionMode
+              ? "bg-primary text-primary-foreground border-primary"
+              : "bg-background text-foreground border-input hover:bg-accent"
+          )}
+        >
+          <CheckSquare className="h-4 w-4" />
+          {selectionMode ? "Cancel" : "Select"}
+        </button>
+
         {/* Count */}
         <div className="ml-auto text-sm text-muted-foreground">
-          Showing {sortedIdeas.length} of {ideas.length} ideas
+          {selectionMode && selectedIds.size > 0 ? (
+            <span>{selectedIds.size} selected</span>
+          ) : (
+            <span>Showing {sortedIdeas.length} of {ideas.length} ideas</span>
+          )}
         </div>
       </div>
 
@@ -160,10 +245,78 @@ export function IdeasView({ onBuildBundle }: IdeasViewProps = {}) {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {sortedIdeas.map((idea) => (
-            <IdeaCard key={idea.idea_id} idea={idea} onBuildBundle={onBuildBundle} />
+            <div key={idea.idea_id} className="relative">
+              {selectionMode ? (
+                <div
+                  onClick={() => toggleSelectIdea(idea.idea_id)}
+                  className="cursor-pointer"
+                >
+                  <div className="absolute top-2 left-2 z-10 pointer-events-none">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(idea.idea_id)}
+                      onChange={() => {}}
+                      className="h-5 w-5 rounded border-border pointer-events-none"
+                    />
+                  </div>
+                  <div className="pointer-events-none">
+                    <IdeaCard
+                      idea={idea}
+                      onBuildBundle={undefined}
+                      onDelete={undefined}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <IdeaCard
+                  idea={idea}
+                  onBuildBundle={onBuildBundle}
+                  onDelete={handleSingleDelete}
+                />
+              )}
+            </div>
           ))}
         </div>
       )}
+
+      {/* Floating Action Bar */}
+      {selectionMode && selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-card border border-border rounded-lg shadow-lg p-4 flex items-center gap-4">
+          <span className="text-sm font-medium">
+            {selectedIds.size} idea{selectedIds.size !== 1 ? "s" : ""} selected
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={selectAll}
+              className="px-3 py-1.5 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent transition-colors"
+            >
+              Select All
+            </button>
+            <button
+              onClick={deselectAll}
+              className="px-3 py-1.5 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent transition-colors"
+            >
+              Deselect All
+            </button>
+            <button
+              onClick={() => setShowDeleteDialog(true)}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors shadow"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Dialog */}
+      <BulkDeleteDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        itemType="ideas"
+        selectedCount={selectedIds.size}
+        onConfirm={handleBulkDelete}
+      />
     </div>
   );
 }

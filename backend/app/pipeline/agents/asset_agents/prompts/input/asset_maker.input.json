@@ -64,23 +64,15 @@
     "fail_on_format_mismatch": true
   },
 
-  "output_config": {
-    "output_directory": "",
-    "create_subdirectories": true,
-    "naming_pattern": "{asset_id}_{name}.{format}",
-    "generate_thumbnails": false
+  "file_naming": {
+    "pattern": "{asset_id}_{name}.{format}",
+    "use_lowercase": true,
+    "use_hyphens_not_spaces": true
   },
 
   "constraints": {
     "max_file_size_mb": 50,
     "max_generation_time_seconds": 300,
-    "supported_formats": ["PDF", "PNG", "JPG", "SVG", "DOCX", "XLSX", "TXT", "MD", "CSV", "HTML"]
-  },
-
-  "emit": {
-    "json_only": true,
-    "no_markdown": true,
-    "strict_required_fields": true,
-    "include_file_hashes": true
+    "supported_formats": ["PDF", "PNG", "JPG", "SVG", "DOCX", "XLSX", "TXT", "MD", "CSV", "HTML", "NOTION"]
   }
 }

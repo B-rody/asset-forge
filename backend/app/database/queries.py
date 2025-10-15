@@ -648,6 +648,22 @@ class CreatedBundleQueries:
             logger.error(f"Failed to get created bundle stats: {e}", exc_info=True)
             return {"total": 0, "by_niche": {}}
 
+    def delete(self, bundle_id: str) -> bool:
+        """Delete created bundle from archive"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("DELETE FROM created_bundles WHERE bundle_id = ?", (bundle_id,))
+            conn.commit()
+
+            logger.info(f"Deleted created bundle: {bundle_id}")
+            return cursor.rowcount > 0
+
+        except sqlite3.Error as e:
+            logger.error(f"Failed to delete created bundle: {e}", exc_info=True)
+            return False
+
 
 class ActivityLogQueries:
     """Query operations for activity_log table (pipeline activity tracking)"""

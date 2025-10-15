@@ -1,6 +1,7 @@
-import React from "react";
-import { X, Package, DollarSign, Tag, FileText, CheckCircle2, XCircle, Clock, Sparkles } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { X, Package, DollarSign, Tag, FileText, XCircle, Trash2, AlertTriangle, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getDisplayStatus } from "@/lib/bundle-status";
 
 interface BundleDetailsDialogProps {
   bundle: {
@@ -17,9 +18,21 @@ interface BundleDetailsDialogProps {
   onOpenChange: (open: boolean) => void;
   onGenerateAssets?: (bundleId: string) => void;
   onPackageBundle?: (bundleId: string) => void;
+  onDelete?: (bundleId: string) => Promise<void>;
 }
 
-export function BundleDetailsDialog({ bundle, open, onOpenChange, onGenerateAssets, onPackageBundle }: BundleDetailsDialogProps) {
+export function BundleDetailsDialog({ bundle, open, onOpenChange, onGenerateAssets, onPackageBundle, onDelete }: BundleDetailsDialogProps) {
+  const [pendingDelete, setPendingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // Reset state when dialog opens/closes
+  useEffect(() => {
+    if (open) {
+      setPendingDelete(false);
+      setDeleting(false);
+    }
+  }, [open]);
+
   if (!open) return null;
 
   const handleGenerateAssets = () => {
@@ -36,6 +49,24 @@ export function BundleDetailsDialog({ bundle, open, onOpenChange, onGenerateAsse
     }
   };
 
+  const handleDeleteClick = () => {
+    setPendingDelete(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (onDelete && pendingDelete) {
+      setDeleting(true);
+      try {
+        await onDelete(bundle.bundle_id);
+        onOpenChange(false); // Close dialog after successful deletion
+      } catch (error) {
+        console.error("Failed to delete bundle:", error);
+        setDeleting(false);
+        setPendingDelete(false);
+      }
+    }
+  };
+
   // Parse planner output
   let plannerData: any = {};
   try {
@@ -44,22 +75,11 @@ export function BundleDetailsDialog({ bundle, open, onOpenChange, onGenerateAsse
     console.error("Failed to parse planner output:", e);
   }
 
-  // Status colors
-  const statusColors = {
-    completed: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-    failed: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-    pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-  };
-
-  const statusIcons = {
-    completed: <CheckCircle2 className="h-4 w-4" />,
-    failed: <XCircle className="h-4 w-4" />,
-    pending: <Clock className="h-4 w-4" />,
-  };
-
-  const statusLabel = bundle.status.charAt(0).toUpperCase() + bundle.status.slice(1);
-  const statusColor = statusColors[bundle.status as keyof typeof statusColors] || statusColors.pending;
-  const statusIcon = statusIcons[bundle.status as keyof typeof statusIcons] || statusIcons.pending;
+  // Get display status based on workflow state
+  const displayStatus = getDisplayStatus(bundle.current_step, bundle.status);
+  const statusLabel = displayStatus.label;
+  const statusColor = displayStatus.color;
+  const statusIcon = displayStatus.icon;
 
   // Can generate assets if planner completed
   const canGenerateAssets = bundle.status === 'completed' && bundle.current_step === 'planner';
@@ -272,46 +292,101 @@ export function BundleDetailsDialog({ bundle, open, onOpenChange, onGenerateAsse
         </div>
 
         {/* Footer */}
-        <div className="border-t border-border p-4 flex justify-between items-center">
-          <button
-            onClick={() => onOpenChange(false)}
-            className="px-4 py-2 text-sm font-medium rounded-md border border-border hover:bg-accent transition-colors"
-          >
-            Close
-          </button>
-
-          {/* Action buttons */}
-          {onGenerateAssets && canGenerateAssets && (
-            <button
-              onClick={handleGenerateAssets}
-              className="px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-all hover:shadow-md flex items-center gap-2"
-            >
-              <Sparkles className="h-4 w-4" />
-              <div className="flex flex-col items-start">
-                <span>Generate Assets</span>
-                <span className="text-xs font-normal text-white/90">Create the digital product files</span>
-              </div>
-            </button>
-          )}
-
-          {onPackageBundle && canPackage && (
-            <button
-              onClick={handlePackageBundle}
-              className="px-4 py-2 text-sm font-medium rounded-md bg-orange-600 text-white hover:bg-orange-700 transition-all hover:shadow-md flex items-center gap-2"
-            >
-              <Package className="h-4 w-4" />
-              <div className="flex flex-col items-start">
-                <span>Package Bundle</span>
-                <span className="text-xs font-normal text-white/90">Create final deliverable package</span>
-              </div>
-            </button>
-          )}
-
-          {bundle.status === 'failed' && (
-            <div className="text-xs text-muted-foreground">
-              This bundle cannot be processed due to errors
+        <div className="border-t border-border p-4">
+          {/* Warning message when pending delete */}
+          {pendingDelete && (
+            <div className="mb-3 flex items-center gap-2 rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
+              <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+              <span>Are you sure you want to delete this bundle? This action cannot be undone.</span>
             </div>
           )}
+
+          <div className="flex justify-between items-center">
+            <div className="flex gap-2">
+              <button
+                onClick={() => onOpenChange(false)}
+                disabled={deleting}
+                className={cn(
+                  "px-4 py-2 text-sm font-medium rounded-md border border-border hover:bg-accent transition-colors",
+                  "disabled:pointer-events-none disabled:opacity-50"
+                )}
+              >
+                Close
+              </button>
+              {onDelete && !pendingDelete && (
+                <button
+                  onClick={handleDeleteClick}
+                  disabled={deleting}
+                  className={cn(
+                    "px-3 py-2 text-sm font-medium rounded-md border border-border hover:bg-destructive/10 hover:border-destructive transition-colors",
+                    "flex items-center gap-2 disabled:pointer-events-none disabled:opacity-50"
+                  )}
+                  title="Delete bundle"
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                  <span className="text-destructive">Delete</span>
+                </button>
+              )}
+              {onDelete && pendingDelete && (
+                <button
+                  onClick={handleConfirmDelete}
+                  disabled={deleting}
+                  className={cn(
+                    "px-4 py-2 text-sm font-medium rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors shadow",
+                    "flex items-center gap-2 disabled:pointer-events-none disabled:opacity-50"
+                  )}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {deleting ? "Deleting..." : "Confirm Delete"}
+                </button>
+              )}
+            </div>
+
+            {/* Action buttons */}
+            {!pendingDelete && (
+              <>
+                {onGenerateAssets && canGenerateAssets && (
+                  <button
+                    onClick={handleGenerateAssets}
+                    disabled={deleting}
+                    className={cn(
+                      "px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-all hover:shadow-md",
+                      "flex items-center gap-2 disabled:pointer-events-none disabled:opacity-50"
+                    )}
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    <div className="flex flex-col items-start">
+                      <span>Generate Assets</span>
+                      <span className="text-xs font-normal text-white/90">Create the digital product files</span>
+                    </div>
+                  </button>
+                )}
+
+                {onPackageBundle && canPackage && (
+                  <button
+                    onClick={handlePackageBundle}
+                    disabled={deleting}
+                    className={cn(
+                      "px-4 py-2 text-sm font-medium rounded-md bg-orange-600 text-white hover:bg-orange-700 transition-all hover:shadow-md",
+                      "flex items-center gap-2 disabled:pointer-events-none disabled:opacity-50"
+                    )}
+                  >
+                    <Package className="h-4 w-4" />
+                    <div className="flex flex-col items-start">
+                      <span>Package Bundle</span>
+                      <span className="text-xs font-normal text-white/90">Create final deliverable package</span>
+                    </div>
+                  </button>
+                )}
+
+                {bundle.status === 'failed' && !onGenerateAssets && !onPackageBundle && (
+                  <div className="text-xs text-muted-foreground">
+                    This bundle cannot be processed due to errors
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

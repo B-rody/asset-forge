@@ -1,5 +1,5 @@
-import React from "react";
-import { X, TrendingUp, Target, AlertCircle, Package } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { X, TrendingUp, Target, AlertCircle, Package, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface IdeaDetailsDialogProps {
@@ -17,15 +17,45 @@ interface IdeaDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onBuildBundle?: (ideaId: string) => void;
+  onDelete?: (ideaId: string) => Promise<void>;
 }
 
-export function IdeaDetailsDialog({ idea, open, onOpenChange, onBuildBundle }: IdeaDetailsDialogProps) {
+export function IdeaDetailsDialog({ idea, open, onOpenChange, onBuildBundle, onDelete }: IdeaDetailsDialogProps) {
+  const [pendingDelete, setPendingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // Reset state when dialog opens/closes
+  useEffect(() => {
+    if (open) {
+      setPendingDelete(false);
+      setDeleting(false);
+    }
+  }, [open]);
+
   if (!open) return null;
 
   const handleBuildBundle = () => {
     if (onBuildBundle) {
       onBuildBundle(idea.idea_id);
       onOpenChange(false); // Close dialog after starting build
+    }
+  };
+
+  const handleDeleteClick = () => {
+    setPendingDelete(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (onDelete && pendingDelete) {
+      setDeleting(true);
+      try {
+        await onDelete(idea.idea_id);
+        onOpenChange(false); // Close dialog after successful deletion
+      } catch (error) {
+        console.error("Failed to delete idea:", error);
+        setDeleting(false);
+        setPendingDelete(false);
+      }
     }
   };
 
@@ -181,25 +211,72 @@ export function IdeaDetailsDialog({ idea, open, onOpenChange, onBuildBundle }: I
         </div>
 
         {/* Footer */}
-        <div className="border-t border-border p-4 flex justify-between items-center">
-          <button
-            onClick={() => onOpenChange(false)}
-            className="px-4 py-2 text-sm font-medium rounded-md border border-border hover:bg-accent transition-colors"
-          >
-            Close
-          </button>
-          {onBuildBundle && (
-            <button
-              onClick={handleBuildBundle}
-              className="px-4 py-2 text-sm font-medium rounded-md bg-primary text-white hover:bg-primary/80 transition-all hover:shadow-md flex items-center gap-2"
-            >
-              <Package className="h-4 w-4" />
-              <div className="flex flex-col items-start">
-                <span>Create Bundle Plan</span>
-                <span className="text-xs font-normal text-white/90">Design bundle structure & pricing</span>
-              </div>
-            </button>
+        <div className="border-t border-border p-4">
+          {/* Warning message when pending delete */}
+          {pendingDelete && (
+            <div className="mb-3 flex items-center gap-2 rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              <span>Are you sure you want to delete this idea? This action cannot be undone.</span>
+            </div>
           )}
+
+          <div className="flex justify-between items-center">
+            <div className="flex gap-2">
+              <button
+                onClick={() => onOpenChange(false)}
+                disabled={deleting}
+                className={cn(
+                  "px-4 py-2 text-sm font-medium rounded-md border border-border hover:bg-accent transition-colors",
+                  "disabled:pointer-events-none disabled:opacity-50"
+                )}
+              >
+                Close
+              </button>
+              {onDelete && !pendingDelete && (
+                <button
+                  onClick={handleDeleteClick}
+                  disabled={deleting}
+                  className={cn(
+                    "px-3 py-2 text-sm font-medium rounded-md border border-border hover:bg-destructive/10 hover:border-destructive transition-colors",
+                    "flex items-center gap-2 disabled:pointer-events-none disabled:opacity-50"
+                  )}
+                  title="Delete idea"
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                  <span className="text-destructive">Delete</span>
+                </button>
+              )}
+              {onDelete && pendingDelete && (
+                <button
+                  onClick={handleConfirmDelete}
+                  disabled={deleting}
+                  className={cn(
+                    "px-4 py-2 text-sm font-medium rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors shadow",
+                    "flex items-center gap-2 disabled:pointer-events-none disabled:opacity-50"
+                  )}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {deleting ? "Deleting..." : "Confirm Delete"}
+                </button>
+              )}
+            </div>
+            {onBuildBundle && !pendingDelete && (
+              <button
+                onClick={handleBuildBundle}
+                disabled={deleting}
+                className={cn(
+                  "px-4 py-2 text-sm font-medium rounded-md bg-primary text-white hover:bg-primary/80 transition-all hover:shadow-md",
+                  "flex items-center gap-2 disabled:pointer-events-none disabled:opacity-50"
+                )}
+              >
+                <Package className="h-4 w-4" />
+                <div className="flex flex-col items-start">
+                  <span>Create Bundle Plan</span>
+                  <span className="text-xs font-normal text-white/90">Design bundle structure & pricing</span>
+                </div>
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

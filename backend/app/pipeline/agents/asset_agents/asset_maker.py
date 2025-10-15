@@ -18,7 +18,7 @@ class MakerAgent(BaseAgent):
 
     def __init__(self, db_manager: Optional["DatabaseManager"] = None):
         """Initialize MakerAgent with base functionality"""
-        super().__init__("maker", db_manager=db_manager)
+        super().__init__("asset_maker", db_manager=db_manager)
 
     def execute(
         self,
@@ -247,11 +247,6 @@ class MakerAgent(BaseAgent):
 
         # Focus on THIS asset only
         input_data["asset_to_create"] = asset
-
-        # Set output directory
-        from app.settings import settings
-        bundle_dir = settings.get_bundle_dir(bundle_id)
-        input_data["output_config"]["output_directory"] = str(bundle_dir / "maker_output")
 
         return json.dumps(input_data, indent=2)
 

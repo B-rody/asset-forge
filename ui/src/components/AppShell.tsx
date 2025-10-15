@@ -35,7 +35,7 @@ export function AppShell() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [result, setResult] = useState<any>(null);
   const [pipelineStartTime, setPipelineStartTime] = useState<number | null>(null);
-  const [runningMode, setRunningMode] = useState<"research" | "auto" | "plan" | null>(null);
+  const [runningMode, setRunningMode] = useState<"research" | "auto" | "plan" | "maker" | "packager" | null>(null);
 
   // Determine if pipeline is running
   const isPipelineRunning = steps.some((s) => s.status === "running");
@@ -98,17 +98,33 @@ export function AppShell() {
         const success = event.success !== false; // Default to true if not specified
         const researchOnly = event.research_only === true;
         const wasPlanMode = runningMode === "plan"; // Capture before clearing
+        const wasMakerMode = runningMode === "maker";
+        const wasPackagerMode = runningMode === "packager";
+        const wasSingleStep = wasPlanMode || wasMakerMode || wasPackagerMode;
+
+        // Calculate actual runtime
+        let runtime: string | undefined;
+        if (pipelineStartTime) {
+          const elapsedSeconds = Math.floor((Date.now() - pipelineStartTime) / 1000);
+          const minutes = Math.floor(elapsedSeconds / 60);
+          const seconds = elapsedSeconds % 60;
+          runtime = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+        }
 
         setLogs((prev) => [
           ...prev,
           {
             timestamp: now,
             message: success
-              ? researchOnly
+              ? event.result?.message || (researchOnly
                 ? "Research completed! Navigating to Library..."
                 : wasPlanMode
                 ? "Bundle plan created successfully! Navigating to Library..."
-                : "Pipeline completed successfully!"
+                : wasMakerMode
+                ? "Asset generation completed successfully! Navigating to Library..."
+                : wasPackagerMode
+                ? "Bundle packaging completed successfully!"
+                : "Pipeline completed successfully!")
               : `Pipeline failed: ${event.error || "Unknown error"}`,
             type: success ? "success" : "error",
           },
@@ -123,42 +139,41 @@ export function AppShell() {
           )
         );
 
+        // Set result data with actual values from backend
+        if (success) {
+          setResult({
+            bundle_id: event.result?.bundle_id || "unknown",
+            bundle_title: event.result?.bundle_title,
+            output_path: event.result?.output_path,
+            file_count: event.result?.file_count,
+            ideas_count: event.result?.ideas_count,
+            store_title: event.result?.store_title,
+            store_description: event.result?.store_description,
+            converted_pdfs: event.result?.converted_pdfs,
+            message: event.result?.message,
+            status: "success",
+            runtime,
+            mode: runningMode, // Pass the mode so ResultPanel knows context
+          });
+        } else {
+          setResult({
+            bundle_id: "failed",
+            output_path: "N/A",
+            status: "error",
+            runtime,
+            mode: runningMode,
+          });
+        }
+
         // Clear pipeline start time and running mode
         setPipelineStartTime(null);
         setRunningMode(null);
 
-        // If research-only mode completed successfully, navigate to Library tab
-        if (success && researchOnly) {
+        // If any single-step mode completed successfully, navigate to Library tab
+        if (success && (researchOnly || wasSingleStep)) {
           setTimeout(() => {
             setActiveTab("library");
           }, 1500); // Brief delay to let user see success message
-        }
-
-        // If plan-only mode completed successfully, navigate to Library tab
-        if (success && wasPlanMode) {
-          setTimeout(() => {
-            setActiveTab("library");
-          }, 1500); // Brief delay to let user see success message
-        }
-
-        if (success && !researchOnly && !wasPlanMode) {
-          setResult({
-            bundle_id: event.result?.bundle_id || "unknown",
-            output_path: event.result?.output_path || "unknown",
-            qa_score: 0.93,
-            status: "success",
-            runtime: "2m 15s",
-            file_count: 3,
-          });
-        } else if (!success) {
-          setResult({
-            bundle_id: "failed",
-            output_path: "N/A",
-            qa_score: 0,
-            status: "error",
-            runtime: "N/A",
-            file_count: 0,
-          });
         }
       } else if (event.event === "error") {
         setLogs((prev) => [
@@ -226,7 +241,7 @@ export function AppShell() {
     handleRunStart([
       { name: "Maker", status: "pending" },
     ]);
-    setRunningMode("auto");
+    setRunningMode("maker");
 
     // Switch to Generate tab to show pipeline progress
     setActiveTab("one-click");
@@ -243,7 +258,7 @@ export function AppShell() {
     handleRunStart([
       { name: "Packager", status: "pending" },
     ]);
-    setRunningMode("auto");
+    setRunningMode("packager");
 
     // Switch to Generate tab to show pipeline progress
     setActiveTab("one-click");
@@ -319,7 +334,12 @@ export function AppShell() {
                     </div>
                   </div>
 
-                  <ResultPanel result={result} />
+                  <ResultPanel
+                    result={result}
+                    onGenerateAssets={handleGenerateAssets}
+                    onPackageBundle={handlePackageBundle}
+                    onNavigateToLibrary={() => setActiveTab("library")}
+                  />
                 </div>
               </>
             )}

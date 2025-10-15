@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Packager Output Schema",
+  "description": "Structured output schema for store listing generation by the Packager agent",
+  "type": "object",
+  "required": ["store_title", "store_description"],
+  "properties": {
+    "store_title": {
+      "type": "string",
+      "description": "SEO-optimized store listing title (50-140 characters recommended)",
+      "minLength": 10,
+      "maxLength": 200
+    },
+    "store_description": {
+      "type": "string",
+      "description": "SEO-optimized store listing description with keywords, benefits, and features",
+      "minLength": 100,
+      "maxLength": 5000
+    }
+  },
+  "additionalProperties": false
+}

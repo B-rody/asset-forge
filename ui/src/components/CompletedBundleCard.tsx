@@ -17,9 +17,10 @@ interface CompletedBundleCardProps {
     output_path: string;
   };
   onOpenFolder?: (path: string) => void;
+  onDelete?: (bundleId: string) => Promise<void>;
 }
 
-export function CompletedBundleCard({ bundle, onOpenFolder }: CompletedBundleCardProps) {
+export function CompletedBundleCard({ bundle, onOpenFolder, onDelete }: CompletedBundleCardProps) {
   const [showDetails, setShowDetails] = useState(false);
 
   const handleOpenFolder = (e: React.MouseEvent) => {
@@ -75,6 +76,9 @@ export function CompletedBundleCard({ bundle, onOpenFolder }: CompletedBundleCar
 
           {/* Metadata */}
           <div className="space-y-2 mb-3">
+            <div className="text-xs text-muted-foreground">
+              {bundle.bundle_id}
+            </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Calendar className="h-3 w-3" />
               <span>{completedDate}</span>
@@ -113,6 +117,7 @@ export function CompletedBundleCard({ bundle, onOpenFolder }: CompletedBundleCar
         open={showDetails}
         onOpenChange={setShowDetails}
         onOpenFolder={onOpenFolder}
+        onDelete={onDelete}
       />
     </>
   );

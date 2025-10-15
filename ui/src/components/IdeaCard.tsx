@@ -16,9 +16,10 @@ interface IdeaCardProps {
     idea_json: string;
   };
   onBuildBundle?: (ideaId: string) => void;
+  onDelete?: (ideaId: string) => Promise<void>;
 }
 
-export function IdeaCard({ idea, onBuildBundle }: IdeaCardProps) {
+export function IdeaCard({ idea, onBuildBundle, onDelete }: IdeaCardProps) {
   const [showDetails, setShowDetails] = useState(false);
 
   // Priority badge colors
@@ -57,8 +58,11 @@ export function IdeaCard({ idea, onBuildBundle }: IdeaCardProps) {
           </span>
         </div>
 
-        {/* Niche */}
-        <div className="mb-3">
+        {/* Idea ID and Niche */}
+        <div className="mb-3 space-y-1">
+          <p className="text-xs text-muted-foreground">
+            {idea.idea_id}
+          </p>
           <p className="text-xs text-muted-foreground">
             {idea.niche} • {idea.sub_niche}
           </p>
@@ -85,6 +89,7 @@ export function IdeaCard({ idea, onBuildBundle }: IdeaCardProps) {
         open={showDetails}
         onOpenChange={setShowDetails}
         onBuildBundle={onBuildBundle}
+        onDelete={onDelete}
       />
     </>
   );

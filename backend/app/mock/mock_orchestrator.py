@@ -12,9 +12,9 @@ from app.logger import setup_logger
 from app.settings import settings
 from app.database import DatabaseManager, BundleRecord, BundleQueries
 from app.mock.agents.mock_researcher import MockResearcherAgent
-from app.mock.agents.mock_planner import MockPlannerAgent
-from app.mock.agents.mock_maker import MockMakerAgent
-from app.mock.agents.mock_packager import MockPackagerAgent
+from app.mock.agents.mock_asset_planner import MockPlannerAgent
+from app.mock.agents.mock_asset_maker import MockMakerAgent
+from app.mock.agents.mock_asset_packager import MockPackagerAgent
 
 logger = setup_logger(__name__)
 

@@ -1,0 +1,21 @@
+{
+  "mode": "package_bundle",
+  "bundle_id": "",
+  "output_schema_version": "packager.v1.0",
+
+  "bundle_info": {
+    "title": "",
+    "description": "",
+    "niche": "",
+    "sub_niche": "",
+    "target_persona": {
+      "age_range": "",
+      "occupation": "",
+      "pain_points": [],
+      "goals": [],
+      "technical_skill_level": ""
+    }
+  },
+
+  "assets": []
+}

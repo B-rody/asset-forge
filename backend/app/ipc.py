@@ -470,6 +470,105 @@ class IPCServer:
                 logger.error(f"Failed to get completed bundles: {e}", exc_info=True)
                 self.emit_error(None, f"Failed to retrieve completed bundles: {str(e)}")
 
+        elif cmd == "delete_idea":
+            try:
+                logger.info("Handling delete_idea command")
+
+                params = command.get("params", {})
+                idea_id = params.get("idea_id")
+
+                if not idea_id:
+                    self.emit_error(None, "No idea_id provided")
+                    return
+
+                # Ensure orchestrator is initialized
+                self._set_orchestrator(False)
+
+                from app.database.queries import IdeaQueries
+                idea_queries = IdeaQueries(self.orchestrator.db_manager)
+                success = idea_queries.delete(idea_id)
+
+                if success:
+                    logger.info(f"Successfully deleted idea: {idea_id}")
+                    self.emit_event({
+                        "event": "idea_deleted",
+                        "success": True,
+                        "idea_id": idea_id
+                    })
+                else:
+                    logger.warning(f"Failed to delete idea: {idea_id}")
+                    self.emit_error(None, f"Failed to delete idea: {idea_id}")
+
+            except Exception as e:
+                logger.error(f"Error deleting idea: {e}", exc_info=True)
+                self.emit_error(None, f"Failed to delete idea: {str(e)}")
+
+        elif cmd == "delete_bundle":
+            try:
+                logger.info("Handling delete_bundle command")
+
+                params = command.get("params", {})
+                bundle_id = params.get("bundle_id")
+
+                if not bundle_id:
+                    self.emit_error(None, "No bundle_id provided")
+                    return
+
+                # Ensure orchestrator is initialized
+                self._set_orchestrator(False)
+
+                from app.database.queries import BundleQueries
+                bundle_queries = BundleQueries(self.orchestrator.db_manager)
+                success = bundle_queries.delete(bundle_id)
+
+                if success:
+                    logger.info(f"Successfully deleted bundle: {bundle_id}")
+                    self.emit_event({
+                        "event": "bundle_deleted",
+                        "success": True,
+                        "bundle_id": bundle_id
+                    })
+                else:
+                    logger.warning(f"Failed to delete bundle: {bundle_id}")
+                    self.emit_error(None, f"Failed to delete bundle: {bundle_id}")
+
+            except Exception as e:
+                logger.error(f"Error deleting bundle: {e}", exc_info=True)
+                self.emit_error(None, f"Failed to delete bundle: {str(e)}")
+
+        elif cmd == "delete_created_bundle":
+            try:
+                logger.info("Handling delete_created_bundle command")
+
+                params = command.get("params", {})
+                bundle_id = params.get("bundle_id")
+
+                if not bundle_id:
+                    self.emit_error(None, "No bundle_id provided")
+                    return
+
+                # Ensure orchestrator is initialized
+                self._set_orchestrator(False)
+
+                from app.database.queries import CreatedBundleQueries
+                created_bundle_queries = CreatedBundleQueries(self.orchestrator.db_manager)
+                success = created_bundle_queries.delete(bundle_id)
+
+                if success:
+                    logger.info(f"Successfully deleted created bundle: {bundle_id}")
+                    self.emit_event({
+                        "event": "created_bundle_deleted",
+                        "success": True,
+                        "bundle_id": bundle_id
+                    })
+                else:
+                    logger.warning(f"Failed to delete created bundle: {bundle_id}")
+                    self.emit_error(None, f"Failed to delete created bundle: {bundle_id}")
+
+            except Exception as e:
+                logger.error(f"Error deleting created bundle: {e}", exc_info=True)
+                self.emit_error(None, f"Failed to delete created bundle: {str(e)}")
+
         elif cmd == "open_folder":
             params = command.get("params", {})
             path = params.get("path")
