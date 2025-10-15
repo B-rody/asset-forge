@@ -257,8 +257,12 @@ class PipelineOrchestrator:
             if not self.created_bundle_queries.create(created_bundle):
                 raise ValueError(f"Failed to archive bundle {bundle_id}")
 
+            # Delete from active bundles table - only after successful archiving
+            # This is the final cleanup step
             if not self.bundle_queries.delete(bundle_id):
-                logger.warning(f"Bundle archived but failed to remove from active table: {bundle_id}")
+                # This is a warning, not a critical error - bundle is already archived
+                logger.warning(f"Bundle archived successfully but failed to remove from active table: {bundle_id}")
+                logger.warning(f"Manual cleanup may be required for bundle_id: {bundle_id}")
 
             emit({"event": "log", "step": "Orchestrator", "message": "Full pipeline complete!"})
 
@@ -281,19 +285,35 @@ class PipelineOrchestrator:
         except Exception as e:
             # Mark activities as failed and determine which step failed
             failed_step = "Orchestrator"
+            bundle_id_to_fail = None
 
             if 'packager_activity_id' in locals():
                 self.activity_queries.update_completion(packager_activity_id, "failed", str(e))
                 failed_step = "Packager"
+                bundle_id_to_fail = locals().get('bundle_id')
             elif 'maker_activity_id' in locals():
                 self.activity_queries.update_completion(maker_activity_id, "failed", str(e))
                 failed_step = "Maker"
+                bundle_id_to_fail = locals().get('bundle_id')
             elif 'planner_activity_id' in locals():
                 self.activity_queries.update_completion(planner_activity_id, "failed", str(e))
                 failed_step = "Planner"
+                bundle_id_to_fail = locals().get('bundle_id')
             elif 'research_activity_id' in locals():
                 self.activity_queries.update_completion(research_activity_id, "failed", str(e))
                 failed_step = "Researcher"
+                # No bundle_id yet for researcher failures
+
+            # Update bundle status to failed if we have a bundle_id
+            if bundle_id_to_fail:
+                # Determine which step name to use based on failed_step
+                step_name_mapping = {
+                    "Planner": "asset_planner",
+                    "Maker": "asset_maker",
+                    "Packager": "asset_packager"
+                }
+                current_step = step_name_mapping.get(failed_step, "unknown")
+                self.bundle_queries.update_step(bundle_id_to_fail, current_step, "failed", str(e))
 
             # Log error
             logger.error(f"Pipeline failed at {failed_step}: {e}")
@@ -378,6 +398,12 @@ class PipelineOrchestrator:
             # Mark activity as failed if it was created
             if 'planner_activity_id' in locals():
                 self.activity_queries.update_completion(planner_activity_id, "failed", str(e))
+
+            # Update bundle status to failed if we have a bundle_id
+            # Planner creates bundle, so we need to check if it was created before failure
+            bundle_id_to_fail = locals().get('planner_result', {}).get('bundle_id')
+            if bundle_id_to_fail:
+                self.bundle_queries.update_step(bundle_id_to_fail, "asset_planner", "failed", str(e))
 
             # Don't re-log the error here since agents already log it with their step name
             # Just emit error event and done status
@@ -485,6 +511,10 @@ class PipelineOrchestrator:
             if 'maker_activity_id' in locals():
                 self.activity_queries.update_completion(maker_activity_id, "failed", str(e))
 
+            # Update bundle status to failed
+            # We have bundle_id as a parameter to this function
+            self.bundle_queries.update_step(bundle_id, "asset_maker", "failed", str(e))
+
             # Don't re-log the error here since agents already log it with their step name
             # Just emit error event and done status
 
@@ -532,7 +562,9 @@ class PipelineOrchestrator:
             planner_data = json.loads(bundle_record.planner_output)
 
             # Step 1: Run packager with bundle_id
+            print("[EMIT] log | step=Packager | message=Creating final package...")
             emit({"event": "log", "step": "Packager", "message": "Creating final package..."})
+            print("[EMIT] progress | step=Packager | pct=0")
             emit({"event": "progress", "step": "Packager", "pct": 0})
 
             # Create activity log for packager
@@ -557,6 +589,7 @@ class PipelineOrchestrator:
                 partial(self.packager.execute, bundle_id=bundle_id, emit=emit)
             )
 
+            print("[EMIT] log | step=Packager | message=Creating bundle archive...")
             emit({"event": "log", "step": "Packager", "message": "Creating bundle archive..."})
 
             # Use final output path from packager result (user's configured output_dir)
@@ -584,18 +617,25 @@ class PipelineOrchestrator:
             if not self.created_bundle_queries.create(created_bundle):
                 raise ValueError(f"Failed to archive bundle {bundle_id}")
 
-            # Delete from active bundles table
-            if not self.bundle_queries.delete(bundle_id):
-                logger.warning(f"Bundle archived but failed to remove from active table: {bundle_id}")
-
-            # Mark activity as completed
+            # Mark activity as completed BEFORE deleting from active table
+            # This ensures activity log is complete even if deletion fails
             self.activity_queries.update_completion(packager_activity_id, "completed", None)
 
+            # Delete from active bundles table - only after successful archiving
+            # This is the final cleanup step
+            if not self.bundle_queries.delete(bundle_id):
+                # This is a warning, not a critical error - bundle is already archived
+                logger.warning(f"Bundle archived successfully but failed to remove from active table: {bundle_id}")
+                logger.warning(f"Manual cleanup may be required for bundle_id: {bundle_id}")
+
+            print("[EMIT] progress | step=Packager | pct=100")
             emit({"event": "progress", "step": "Packager", "pct": 100})
+            print("[EMIT] log | step=Orchestrator | message=Packaging complete - bundle moved to archive")
             emit({"event": "log", "step": "Orchestrator", "message": "Packaging complete - bundle moved to archive"})
 
             # Emit done event with packager results
             bundle_title = planner_data.get("title", "Untitled Bundle")
+            print(f"[EMIT] done | success=True | bundle_id={bundle_id}")
             emit({
                 "event": "done",
                 "success": True,
@@ -615,6 +655,10 @@ class PipelineOrchestrator:
             # Mark activity as failed if it was created
             if 'packager_activity_id' in locals():
                 self.activity_queries.update_completion(packager_activity_id, "failed", str(e))
+
+            # Update bundle status to failed
+            # We have bundle_id as a parameter to this function
+            self.bundle_queries.update_step(bundle_id, "asset_packager", "failed", str(e))
 
             # Don't re-log the error here since agents already log it with their step name
             # Just emit error event and done status

@@ -157,10 +157,37 @@ Create the specified asset following these steps:
 
 You must create the actual digital product file(s) using Python in the code_interpreter container:
 
-1. **Generate the file content** using appropriate Python libraries (openpyxl for XLSX, python-docx for DOCX, etc.)
+1. **Generate the file content** using appropriate Python libraries (openpyxl for XLSX, python-docx for DOCX, zipfile for archives, etc.)
 2. **Save file(s) in the container** with the correct filenames
-3. **Follow format rules below** - especially for PDF assets (use Markdown instead)
-4. **Create multiple files if needed** (e.g., main file + supporting files, images, templates)
+3. **Follow format rules below** - especially for Markdown-to-PDF conversion
+4. **Use ZIP files for complex multi-file assets** (see rules below)
+
+**CRITICAL FILE STORAGE RULE: NO SUBDIRECTORIES IN /mnt/data/**
+
+⚠️ **NEVER create subdirectories or folders directly in `/mnt/data/`.**
+
+The OpenAI container API does not support downloading directories - they are listed as "file" objects but cause 404 errors when downloaded.
+
+**All files must be saved directly in `/mnt/data/` root - no nested folders.**
+
+**For simple assets:**
+- Save the file directly in `/mnt/data/` root
+- Examples: Single Excel file, single Markdown file, single Word document
+
+**For complex assets that need folder structure:**
+- Create a ZIP file containing the internal folder structure
+- Save the ZIP file directly in `/mnt/data/` root (not in a subdirectory)
+- The ZIP can have any internal folder structure you need
+- Examples: Notion templates, template packs with multiple files and folders
+
+**When to use ZIP files:**
+- Notion templates with supporting files and organized folders
+- Template packs with multiple related templates
+- Assets with images, instructions, and multiple organized components
+- Any asset that benefits from internal folder organization
+
+**Always keep separate (never inside ZIP):**
+- `asset_metadata.json` must always be a standalone file in `/mnt/data/` root
 
 ### MARKDOWN AS PDF ALTERNATIVE (REQUIRED)
 

@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { HeaderBar } from "./HeaderBar";
 import { Sidebar } from "./Sidebar";
 import { RunPanel } from "./RunPanel";
 import { ResultPanel } from "./ResultPanel";
 import { StepChips } from "./StepChips";
 import { LogStream } from "./LogStream";
-import { LibraryPanel } from "./LibraryPanel";
+import { LibraryPanel, LibraryTab } from "./LibraryPanel";
 import { HistoryPanel } from "./HistoryPanel";
 import { ipcClient, IPCEvent } from "@/lib/ipc";
 
@@ -23,6 +23,12 @@ interface LogEntry {
   type: "info" | "success" | "error" | "progress";
 }
 
+// Backend now sends normalized step names directly (e.g., "Packager", "Maker", "Planner", "Researcher")
+// No normalization needed - just pass through the step name
+const normalizeStepName = (backendStepName: string | undefined): string | undefined => {
+  return backendStepName;
+};
+
 export function AppShell() {
   const [activeTab, setActiveTab] = useState<TabId>("one-click");
   const [steps, setSteps] = useState<StepChip[]>([
@@ -36,31 +42,55 @@ export function AppShell() {
   const [result, setResult] = useState<any>(null);
   const [pipelineStartTime, setPipelineStartTime] = useState<number | null>(null);
   const [runningMode, setRunningMode] = useState<"research" | "auto" | "plan" | "maker" | "packager" | null>(null);
+  const [libraryDefaultTab, setLibraryDefaultTab] = useState<LibraryTab | undefined>(undefined);
+
+  // Use refs to avoid resubscription race condition
+  const runningModeRef = useRef(runningMode);
+  const pipelineStartTimeRef = useRef(pipelineStartTime);
+
+  // Update refs when state changes
+  useEffect(() => {
+    runningModeRef.current = runningMode;
+  }, [runningMode]);
+
+  useEffect(() => {
+    pipelineStartTimeRef.current = pipelineStartTime;
+  }, [pipelineStartTime]);
 
   // Determine if pipeline is running
   const isPipelineRunning = steps.some((s) => s.status === "running");
 
+  // Debug log when isPipelineRunning changes
+  useEffect(() => {
+    console.log("🔴 [AppShell] isPipelineRunning changed:", isPipelineRunning, "| steps:", JSON.stringify(steps.map(s => ({ name: s.name, status: s.status }))));
+  }, [isPipelineRunning, steps]);
+
   useEffect(() => {
     // Subscribe to IPC events
     const unsubscribe = ipcClient.subscribe((event: IPCEvent) => {
+      console.log("🔵 [AppShell] Received event:", event);
       const now = new Date().toLocaleTimeString();
 
       if (event.event === "log") {
+        const normalizedStep = normalizeStepName(event.step);
+        console.log(`🟢 [AppShell] Normalized step: "${event.step}" → "${normalizedStep}"`);
+
         setLogs((prev) => [
           ...prev,
           {
             timestamp: now,
-            step: event.step,
+            step: normalizedStep,
             message: event.message || "",
             type: "info",
           },
         ]);
 
         // Update step status: mark previous running step as complete, start new step
-        if (event.step) {
+        if (normalizedStep) {
           setSteps((prev) => {
+            console.log("🟡 [AppShell] Before setSteps:", JSON.stringify(prev.map(s => ({ name: s.name, status: s.status }))));
             const newSteps = prev.map((s) => {
-              if (s.name === event.step) {
+              if (s.name === normalizedStep) {
                 return { ...s, status: "running" as const };
               } else if (s.status === "running") {
                 // Mark previous running step as complete
@@ -68,44 +98,48 @@ export function AppShell() {
               }
               return s;
             });
+            console.log("🟡 [AppShell] After setSteps:", JSON.stringify(newSteps.map(s => ({ name: s.name, status: s.status }))));
 
             // Set start time if this is the first step to run
             if (prev.every((s) => s.status === "pending")) {
               setPipelineStartTime(Date.now());
+              console.log("⏱️ [AppShell] Set pipeline start time");
             }
 
             return newSteps;
           });
           // Reset progress for new step
-          setStepProgress((prev) => ({ ...prev, [event.step]: 0 }));
+          setStepProgress((prev) => ({ ...prev, [normalizedStep]: 0 }));
         }
       } else if (event.event === "progress") {
+        const normalizedStep = normalizeStepName(event.step);
+
         setLogs((prev) => [
           ...prev,
           {
             timestamp: now,
-            step: event.step,
+            step: normalizedStep,
             message: `Progress: ${event.pct}%`,
             type: "progress",
           },
         ]);
 
         // Update step progress
-        if (event.step && event.pct !== undefined) {
-          setStepProgress((prev) => ({ ...prev, [event.step]: event.pct }));
+        if (normalizedStep && event.pct !== undefined) {
+          setStepProgress((prev) => ({ ...prev, [normalizedStep]: event.pct }));
         }
       } else if (event.event === "done") {
         const success = event.success !== false; // Default to true if not specified
         const researchOnly = event.research_only === true;
-        const wasPlanMode = runningMode === "plan"; // Capture before clearing
-        const wasMakerMode = runningMode === "maker";
-        const wasPackagerMode = runningMode === "packager";
+        const wasPlanMode = runningModeRef.current === "plan"; // Use ref for current value
+        const wasMakerMode = runningModeRef.current === "maker";
+        const wasPackagerMode = runningModeRef.current === "packager";
         const wasSingleStep = wasPlanMode || wasMakerMode || wasPackagerMode;
 
         // Calculate actual runtime
         let runtime: string | undefined;
-        if (pipelineStartTime) {
-          const elapsedSeconds = Math.floor((Date.now() - pipelineStartTime) / 1000);
+        if (pipelineStartTimeRef.current) {
+          const elapsedSeconds = Math.floor((Date.now() - pipelineStartTimeRef.current) / 1000);
           const minutes = Math.floor(elapsedSeconds / 60);
           const seconds = elapsedSeconds % 60;
           runtime = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
@@ -153,7 +187,7 @@ export function AppShell() {
             message: event.result?.message,
             status: "success",
             runtime,
-            mode: runningMode, // Pass the mode so ResultPanel knows context
+            mode: runningModeRef.current, // Use ref for current value
           });
         } else {
           setResult({
@@ -161,7 +195,7 @@ export function AppShell() {
             output_path: "N/A",
             status: "error",
             runtime,
-            mode: runningMode,
+            mode: runningModeRef.current,
           });
         }
 
@@ -171,25 +205,41 @@ export function AppShell() {
 
         // If any single-step mode completed successfully, navigate to Library tab
         if (success && (researchOnly || wasSingleStep)) {
-          setTimeout(() => {
-            setActiveTab("library");
-          }, 1500); // Brief delay to let user see success message
+          // Determine which Library sub-tab to show
+          let targetTab: LibraryTab | undefined;
+          if (researchOnly) {
+            targetTab = "ideas";
+          } else if (wasPlanMode) {
+            targetTab = "ready";
+          } else if (wasMakerMode) {
+            targetTab = "generated";
+          }
+          // Note: wasPackagerMode doesn't navigate to Library
+
+          if (!wasPackagerMode) {
+            setLibraryDefaultTab(targetTab);
+            setTimeout(() => {
+              setActiveTab("library");
+            }, 1500); // Brief delay to let user see success message
+          }
         }
       } else if (event.event === "error") {
+        const normalizedStep = normalizeStepName(event.step);
+
         setLogs((prev) => [
           ...prev,
           {
             timestamp: now,
-            step: event.step,
+            step: normalizedStep,
             message: event.message || "Unknown error",
             type: "error",
           },
         ]);
 
-        if (event.step) {
+        if (normalizedStep) {
           setSteps((prev) =>
             prev.map((s) =>
-              s.name === event.step ? { ...s, status: "error" } : s
+              s.name === normalizedStep ? { ...s, status: "error" } : s
             )
           );
         }
@@ -201,7 +251,7 @@ export function AppShell() {
     });
 
     return unsubscribe;
-  }, []);
+  }, []); // Empty array - subscribe once on mount, never resubscribe
 
   const handleRunStart = (stepsToShow?: StepChip[]) => {
     // Reset state
@@ -304,6 +354,7 @@ export function AppShell() {
                 onBuildBundle={handleCreatePlanFromIdea}
                 onGenerateAssets={handleGenerateAssets}
                 onPackageBundle={handlePackageBundle}
+                defaultTab={libraryDefaultTab}
               />
             ) : activeTab === "history" ? (
               <HistoryPanel onOpenFolder={handleOpenFolder} />
@@ -314,7 +365,7 @@ export function AppShell() {
                   onResearchOnly={handleResearchOnly}
                   onAutoGenerate={handleAutoGenerate}
                   isRunning={isPipelineRunning}
-                  runningMode={runningMode}
+                  runningMode={runningMode === "maker" || runningMode === "packager" ? null : runningMode}
                 />
 
                 <div className="rounded-lg border border-border bg-card p-6">

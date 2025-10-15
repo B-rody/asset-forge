@@ -43,6 +43,9 @@ class ResearcherAgent(BaseAgent):
         emit({"event": "log", "step": self.step_name, "message": "Starting research..."})
 
         try:
+            # Build enhanced instructions with off-limits ideas
+            enhanced_instructions = self._build_enhanced_instructions(emit)
+
             # Build user prompt based on mode
             user_prompt = self._build_user_prompt(focus, niches)
 
@@ -51,7 +54,7 @@ class ResearcherAgent(BaseAgent):
             # Call OpenAI API
             response = self.client.responses.create(
                 model="gpt-5",
-                instructions = self.instructions,
+                instructions=enhanced_instructions,
                 input=user_prompt,
                 tools=[{"type": "web_search"}],
                 reasoning={"effort" : "medium"},
@@ -97,6 +100,61 @@ class ResearcherAgent(BaseAgent):
             self.logger.error(f"Execution failed: {e}")
             emit({"event": "error", "step": self.step_name, "message": str(e)})
             raise
+
+    def _build_enhanced_instructions(self, emit: Callable[[Dict[str, Any]], None]) -> str:
+        """
+        Build enhanced instructions with off-limits ideas from the database.
+
+        Fetches product ideas from the past 8 weeks (both active and used ideas)
+        and adds them to the system instructions to prevent duplicates.
+
+        Args:
+            emit: Callback function for progress updates
+
+        Returns:
+            Enhanced instructions string with off-limits ideas appended
+        """
+        # Start with base instructions
+        instructions = self.instructions
+
+        # Only fetch off-limits ideas if db_manager is available
+        if not self.db_manager:
+            self.logger.info("No db_manager available, skipping off-limits ideas check")
+            return instructions
+
+        try:
+            emit({"event": "log", "step": self.step_name, "message": "Checking for off-limits ideas..."})
+
+            # Fetch recent idea titles (past 8 weeks) from both ideas and used_ideas tables
+            off_limits_titles = self.idea_queries.get_historical_titles(weeks_back=8)
+
+            # Only append off-limits section if we have ideas to exclude
+            if off_limits_titles and len(off_limits_titles) > 0:
+                self.logger.info(f"Found {len(off_limits_titles)} off-limits ideas from past 8 weeks")
+
+                # Append off-limits section to instructions
+                off_limits_section = "\n\n## OFF-LIMITS IDEAS\n\n"
+                off_limits_section += "The following product ideas have been researched or used in the past 8 weeks. "
+                off_limits_section += "DO NOT generate ideas with these exact titles or extremely similar concepts:\n\n"
+
+                for title in off_limits_titles:
+                    off_limits_section += f"- {title}\n"
+
+                off_limits_section += "\nEnsure your new ideas are distinctly different from these existing ideas."
+
+                instructions += off_limits_section
+                emit({"event": "log", "step": self.step_name, "message": f"Added {len(off_limits_titles)} off-limits ideas to instructions"})
+            else:
+                # No off-limits ideas - use base instructions without modification
+                self.logger.info("No off-limits ideas found - using base instructions")
+                emit({"event": "log", "step": self.step_name, "message": "No off-limits ideas to exclude"})
+
+        except Exception as e:
+            # Log error but don't fail the entire request
+            self.logger.warning(f"Failed to fetch off-limits ideas: {e}")
+            emit({"event": "log", "step": self.step_name, "message": "Warning: Could not fetch off-limits ideas"})
+
+        return instructions
 
     def _build_user_prompt(self, focus: bool, niches: str) -> str:
         """

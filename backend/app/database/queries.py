@@ -724,6 +724,11 @@ class ActivityLogQueries:
             completed_at = datetime.now()
             duration_seconds = int((completed_at - started_at).total_seconds())
 
+            # Ensure duration is never negative (protect against clock skew/timezone issues)
+            if duration_seconds < 0:
+                logger.warning(f"Negative duration detected ({duration_seconds}s) for {activity_id}, setting to 0")
+                duration_seconds = 0
+
             cursor.execute("""
                 UPDATE activity_log
                 SET status = ?, completed_at = ?, duration_seconds = ?, error_message = ?

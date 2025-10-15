@@ -38,8 +38,8 @@ class PackagerAgent(BaseAgent):
             # Running as compiled binary (Nuitka)
             base_path = Path(sys.executable).parent
         else:
-            # Running in dev mode - navigate from backend/app/pipeline/agents/ to backend/
-            base_path = Path(__file__).parent.parent.parent.parent
+            # Running in dev mode - navigate from backend/app/pipeline/agents/asset_agents/ to backend/
+            base_path = Path(__file__).parent.parent.parent.parent.parent
 
         # Platform-specific executable name
         if sys.platform == 'win32':
@@ -56,6 +56,40 @@ class PackagerAgent(BaseAgent):
         else:
             self.logger.warning(f"Bundled pandoc not found at {pandoc_exe}, using system pandoc")
             return 'pandoc'
+
+    def _get_wkhtmltopdf_path(self) -> str:
+        """
+        Get path to bundled wkhtmltopdf executable
+
+        Returns path to bundled wkhtmltopdf in backend/bin/wkhtmltopdf/bin/, or falls back to system wkhtmltopdf
+        Handles both dev mode (running from source) and production mode (compiled with Nuitka)
+
+        Returns:
+            str: Path to wkhtmltopdf executable
+        """
+        # Determine base path based on whether we're running as compiled binary or source
+        if getattr(sys, 'frozen', False):
+            # Running as compiled binary (Nuitka)
+            base_path = Path(sys.executable).parent
+        else:
+            # Running in dev mode - navigate from backend/app/pipeline/agents/asset_agents/ to backend/
+            base_path = Path(__file__).parent.parent.parent.parent.parent
+
+        # Platform-specific executable name (nested in wkhtmltopdf/bin subdirectory)
+        if sys.platform == 'win32':
+            wkhtmltopdf_exe = base_path / 'bin' / 'wkhtmltopdf' / 'bin' / 'wkhtmltopdf.exe'
+        elif sys.platform == 'darwin':
+            wkhtmltopdf_exe = base_path / 'bin' / 'wkhtmltopdf' / 'bin' / 'wkhtmltopdf'
+        else:
+            wkhtmltopdf_exe = base_path / 'bin' / 'wkhtmltopdf' / 'bin' / 'wkhtmltopdf'
+
+        # Use bundled wkhtmltopdf if it exists, otherwise fallback to system wkhtmltopdf
+        if wkhtmltopdf_exe.exists():
+            self.logger.info(f"Using bundled wkhtmltopdf: {wkhtmltopdf_exe}")
+            return str(wkhtmltopdf_exe)
+        else:
+            self.logger.warning(f"Bundled wkhtmltopdf not found at {wkhtmltopdf_exe}, using system wkhtmltopdf")
+            return 'wkhtmltopdf'
 
     def execute(
         self,
@@ -334,8 +368,9 @@ class PackagerAgent(BaseAgent):
 
         emit({"event": "log", "step": self.step_name, "message": f"Converting {len(markdown_files)} markdown file(s) to PDF..."})
 
-        # Get path to bundled pandoc executable
+        # Get paths to bundled executables
         pandoc_path = self._get_pandoc_path()
+        wkhtmltopdf_path = self._get_wkhtmltopdf_path()
 
         for md_file in markdown_files:
             try:
@@ -343,18 +378,34 @@ class PackagerAgent(BaseAgent):
                 pdf_name = md_file.name.replace("CONVERTPDF_", "").replace(".md", ".pdf")
                 pdf_path = md_file.parent / pdf_name
 
-                # Run pandoc to convert markdown to PDF
+                # Add wkhtmltopdf directory to PATH for DLL dependencies
+                import os
+                env = os.environ.copy()
+                wkhtmltopdf_dir = str(Path(wkhtmltopdf_path).parent)
+                if sys.platform == 'win32':
+                    env['PATH'] = f"{wkhtmltopdf_dir};{env.get('PATH', '')}"
+                else:
+                    env['PATH'] = f"{wkhtmltopdf_dir}:{env.get('PATH', '')}"
+
+                # Run pandoc to convert markdown to PDF using wkhtmltopdf with formatting
                 result = subprocess.run(
                     [
                         pandoc_path,
                         str(md_file),
                         "-o",
                         str(pdf_path),
-                        "--pdf-engine=xelatex"
+                        f"--pdf-engine={wkhtmltopdf_path}",
+                        "--css", "data:text/css,body{font-family:Arial,sans-serif;max-width:100%;margin:0.5in;background:white;color:#333;}h1{color:#2c3e50;border-bottom:2px solid #3498db;padding-bottom:0.3em;margin-top:0.5em;}h2{color:#34495e;border-bottom:1px solid #bdc3c7;padding-bottom:0.2em;margin-top:0.4em;}table{border-collapse:collapse;width:100%;margin:1em 0;}th,td{border:1px solid #ddd;padding:8px;text-align:left;}th{background-color:#f2f2f2;}",
+                        "--metadata", "pagetitle=AssetForge Digital Product",
+                        "--pdf-engine-opt=--margin-top", "--pdf-engine-opt=0.5in",
+                        "--pdf-engine-opt=--margin-bottom", "--pdf-engine-opt=0.5in",
+                        "--pdf-engine-opt=--margin-left", "--pdf-engine-opt=0.5in",
+                        "--pdf-engine-opt=--margin-right", "--pdf-engine-opt=0.5in"
                     ],
                     capture_output=True,
                     text=True,
-                    timeout=60
+                    timeout=60,
+                    env=env
                 )
 
                 if result.returncode == 0:
@@ -365,7 +416,12 @@ class PackagerAgent(BaseAgent):
                     # Optionally delete the markdown file after conversion
                     # md_file.unlink()
                 else:
-                    error_msg = f"Pandoc failed for {md_file.name}: {result.stderr}"
+                    # Check if error is due to missing wkhtmltopdf
+                    stderr_lower = result.stderr.lower()
+                    if "wkhtmltopdf" in stderr_lower or "pdf-engine" in stderr_lower:
+                        error_msg = f"Pandoc failed for {md_file.name}: wkhtmltopdf not found. Please download from https://wkhtmltopdf.org/downloads.html and place in backend/bin/"
+                    else:
+                        error_msg = f"Pandoc failed for {md_file.name}: {result.stderr}"
                     self.logger.error(error_msg)
                     emit({"event": "log", "step": self.step_name, "message": f"⚠ {error_msg}"})
 

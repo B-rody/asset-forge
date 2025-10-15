@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { IdeasView } from "./IdeasView";
 import { BundlesView } from "./BundlesView";
 
-type LibraryTab = "ideas" | "ready" | "generated";
+export type LibraryTab = "ideas" | "ready" | "generated";
 
 interface LibraryStats {
   ideas_count: number;
@@ -16,21 +16,37 @@ interface LibraryPanelProps {
   onBuildBundle?: (ideaId: string) => void;
   onGenerateAssets?: (bundleId: string) => void;
   onPackageBundle?: (bundleId: string) => void;
+  defaultTab?: LibraryTab;
 }
 
-export function LibraryPanel({ onBuildBundle, onGenerateAssets, onPackageBundle }: LibraryPanelProps) {
-  const [activeTab, setActiveTab] = useState<LibraryTab>("ideas");
+export function LibraryPanel({ onBuildBundle, onGenerateAssets, onPackageBundle, defaultTab }: LibraryPanelProps) {
+  const [activeTab, setActiveTab] = useState<LibraryTab>(defaultTab || "ideas");
   const [stats, setStats] = useState<LibraryStats>({ ideas_count: 0, bundles_count: 0 });
 
+  // Update active tab when defaultTab prop changes
   useEffect(() => {
-    // Fetch library stats on mount
+    if (defaultTab) {
+      setActiveTab(defaultTab);
+    }
+  }, [defaultTab]);
+
+  useEffect(() => {
+    // Fetch library stats on mount and when database changes
     const unsubscribe = ipcClient.subscribe((event) => {
       if (event.event === "library_stats") {
         setStats(event.stats as LibraryStats);
+      } else if (
+        event.event === "idea_deleted" ||
+        event.event === "bundle_deleted" ||
+        event.event === "created_bundle_deleted" ||
+        (event.event === "done" && (event.result?.mode === "plan" || event.result?.mode === "packager"))
+      ) {
+        // Database changed - refetch stats
+        ipcClient.sendCommand({ cmd: "get_library_stats" });
       }
     });
 
-    // Request stats
+    // Request initial stats
     ipcClient.sendCommand({ cmd: "get_library_stats" });
 
     return unsubscribe;

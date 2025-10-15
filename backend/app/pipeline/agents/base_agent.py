@@ -70,10 +70,14 @@ class BaseAgent(ABC):
         """
         Returns the capitalized step name for frontend display.
 
+        Strips "asset_" prefix if present to normalize agent names.
+
         Returns:
-            str: Capitalized agent name (e.g., 'researcher' -> 'Researcher')
+            str: Capitalized agent name (e.g., 'asset_packager' -> 'Packager', 'researcher' -> 'Researcher')
         """
-        return self.agent_name.capitalize()
+        # Strip "asset_" prefix if present, then capitalize
+        clean_name = self.agent_name.replace("asset_", "")
+        return clean_name.capitalize()
 
     @property
     def research_queries(self):
