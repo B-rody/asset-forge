@@ -331,6 +331,36 @@ class BundleQueries:
             logger.error(f"Failed to fetch bundles: {e}", exc_info=True)
             return []
 
+    def get_by_step(self, current_step: str, limit: int = 100) -> List[Bundle]:
+        """
+        Fetch bundles at a specific step, regardless of status.
+        Used for workflow tabs (Ready to Make, Ready to Package).
+
+        Args:
+            current_step: The step to filter by (maker, packager)
+            limit: Maximum number of bundles to return
+
+        Returns:
+            List of bundles at the specified step
+        """
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT * FROM bundles
+                WHERE current_step = ?
+                ORDER BY updated_at DESC
+                LIMIT ?
+            """, (current_step, limit))
+
+            rows = cursor.fetchall()
+            return [Bundle(**dict(row)) for row in rows]
+
+        except sqlite3.Error as e:
+            logger.error(f"Failed to fetch bundles by step: {e}", exc_info=True)
+            return []
+
     def get_all(self, limit: int = 100) -> List[Bundle]:
         """Fetch all bundles"""
         try:
@@ -351,12 +381,18 @@ class BundleQueries:
             return []
 
     def get_ready_for_maker(self, limit: int = 100) -> List[Bundle]:
-        """Fetch bundles ready for maker (planner completed)"""
-        return self.get_by_step_and_status("planner", "completed")
+        """
+        Fetch bundles at the maker step (all statuses: pending, failed).
+        Shows in "Ready to Make" workflow tab.
+        """
+        return self.get_by_step("maker", limit)
 
     def get_ready_for_packager(self, limit: int = 100) -> List[Bundle]:
-        """Fetch bundles ready for packager (maker completed)"""
-        return self.get_by_step_and_status("maker", "completed")
+        """
+        Fetch bundles at the packager step (all statuses: pending, failed).
+        Shows in "Ready to Package" workflow tab.
+        """
+        return self.get_by_step("packager", limit)
 
     def delete(self, bundle_id: str) -> bool:
         """Delete bundle (used when moving to created_bundles)"""
@@ -705,14 +741,22 @@ class ActivityLogQueries:
         self,
         activity_id: str,
         status: str,
-        error_message: Optional[str] = None
+        error_message: Optional[str] = None,
+        duration_seconds: Optional[int] = None
     ) -> bool:
-        """Update activity completion status"""
+        """Update activity completion status
+
+        Args:
+            activity_id: The activity to update
+            status: New status (completed, failed)
+            error_message: Optional error message
+            duration_seconds: Optional duration from frontend (preferred). If not provided, calculates from start time.
+        """
         try:
             conn = self.db.get_connection()
             cursor = conn.cursor()
 
-            # Get the start time to calculate duration
+            # Get the start time to calculate duration if not provided
             cursor.execute("SELECT started_at FROM activity_log WHERE activity_id = ?", (activity_id,))
             row = cursor.fetchone()
 
@@ -720,14 +764,21 @@ class ActivityLogQueries:
                 logger.warning(f"Activity not found for update: {activity_id}")
                 return False
 
-            started_at = datetime.fromisoformat(row["started_at"])
             completed_at = datetime.now()
-            duration_seconds = int((completed_at - started_at).total_seconds())
 
-            # Ensure duration is never negative (protect against clock skew/timezone issues)
-            if duration_seconds < 0:
-                logger.warning(f"Negative duration detected ({duration_seconds}s) for {activity_id}, setting to 0")
-                duration_seconds = 0
+            # Use provided duration if valid, otherwise calculate
+            if duration_seconds is not None and duration_seconds >= 0:
+                # Use frontend-provided duration (already validated)
+                logger.info(f"Using frontend-provided duration: {duration_seconds}s for {activity_id}")
+            else:
+                # Fall back to backend calculation
+                started_at = datetime.fromisoformat(row["started_at"])
+                duration_seconds = int((completed_at - started_at).total_seconds())
+
+                # Ensure duration is never negative (protect against clock skew/timezone issues)
+                if duration_seconds < 0:
+                    logger.warning(f"Negative duration detected ({duration_seconds}s) for {activity_id}, setting to 0")
+                    duration_seconds = 0
 
             cursor.execute("""
                 UPDATE activity_log

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { X, Trash2, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 

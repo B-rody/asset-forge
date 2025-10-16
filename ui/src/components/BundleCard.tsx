@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Package, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getDisplayStatus } from "@/lib/bundle-status";

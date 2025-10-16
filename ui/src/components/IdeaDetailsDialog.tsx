@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { X, TrendingUp, Target, AlertCircle, Package, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -17,10 +17,11 @@ interface IdeaDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onBuildBundle?: (ideaId: string) => void;
+  onBuildFullBundle?: (ideaId: string) => void;
   onDelete?: (ideaId: string) => Promise<void>;
 }
 
-export function IdeaDetailsDialog({ idea, open, onOpenChange, onBuildBundle, onDelete }: IdeaDetailsDialogProps) {
+export function IdeaDetailsDialog({ idea, open, onOpenChange, onBuildBundle, onBuildFullBundle, onDelete }: IdeaDetailsDialogProps) {
   const [pendingDelete, setPendingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -37,6 +38,13 @@ export function IdeaDetailsDialog({ idea, open, onOpenChange, onBuildBundle, onD
   const handleBuildBundle = () => {
     if (onBuildBundle) {
       onBuildBundle(idea.idea_id);
+      onOpenChange(false); // Close dialog after starting build
+    }
+  };
+
+  const handleBuildFullBundle = () => {
+    if (onBuildFullBundle) {
+      onBuildFullBundle(idea.idea_id);
       onOpenChange(false); // Close dialog after starting build
     }
   };
@@ -260,22 +268,40 @@ export function IdeaDetailsDialog({ idea, open, onOpenChange, onBuildBundle, onD
                 </button>
               )}
             </div>
-            {onBuildBundle && !pendingDelete && (
-              <button
-                onClick={handleBuildBundle}
-                disabled={deleting}
-                className={cn(
-                  "px-4 py-2 text-sm font-medium rounded-md bg-primary text-white hover:bg-primary/80 transition-all hover:shadow-md",
-                  "flex items-center gap-2 disabled:pointer-events-none disabled:opacity-50"
-                )}
-              >
-                <Package className="h-4 w-4" />
-                <div className="flex flex-col items-start">
-                  <span>Create Bundle Plan</span>
-                  <span className="text-xs font-normal text-white/90">Design bundle structure & pricing</span>
-                </div>
-              </button>
-            )}
+            <div className="flex gap-2">
+              {onBuildBundle && !pendingDelete && (
+                <button
+                  onClick={handleBuildBundle}
+                  disabled={deleting}
+                  className={cn(
+                    "px-4 py-2 text-sm font-medium rounded-md border border-primary text-primary hover:bg-primary/10 transition-all",
+                    "flex items-center gap-2 disabled:pointer-events-none disabled:opacity-50"
+                  )}
+                >
+                  <Package className="h-4 w-4" />
+                  <div className="flex flex-col items-start">
+                    <span>Create Bundle Plan</span>
+                    <span className="text-xs font-normal opacity-80">Planner only</span>
+                  </div>
+                </button>
+              )}
+              {onBuildFullBundle && !pendingDelete && (
+                <button
+                  onClick={handleBuildFullBundle}
+                  disabled={deleting}
+                  className={cn(
+                    "px-4 py-2 text-sm font-medium rounded-md bg-primary text-white hover:bg-primary/80 transition-all hover:shadow-md",
+                    "flex items-center gap-2 disabled:pointer-events-none disabled:opacity-50"
+                  )}
+                >
+                  <Package className="h-4 w-4" />
+                  <div className="flex flex-col items-start">
+                    <span>Generate Complete Bundle</span>
+                    <span className="text-xs font-normal text-white/90">Full pipeline (Plan + Make + Package)</span>
+                  </div>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

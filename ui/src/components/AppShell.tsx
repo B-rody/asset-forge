@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { HeaderBar } from "./HeaderBar";
 import { Sidebar } from "./Sidebar";
 import { RunPanel } from "./RunPanel";
@@ -125,8 +125,9 @@ export function AppShell() {
         ]);
 
         // Update step progress
-        if (normalizedStep && event.pct !== undefined) {
-          setStepProgress((prev) => ({ ...prev, [normalizedStep]: event.pct }));
+        if (normalizedStep && typeof event.pct === 'number') {
+          const pct = event.pct; // Capture value for type narrowing
+          setStepProgress((prev) => ({ ...prev, [normalizedStep]: pct }));
         }
       } else if (event.event === "done") {
         const success = event.success !== false; // Default to true if not specified
@@ -286,6 +287,31 @@ export function AppShell() {
     });
   };
 
+  const handleBuildFullFromIdea = (ideaId: string) => {
+    // Reset state for full pipeline run - show Planner, Maker, Packager steps
+    handleRunStart([
+      { name: "Planner", status: "pending" },
+      { name: "Maker", status: "pending" },
+      { name: "Packager", status: "pending" },
+    ]);
+    setRunningMode("auto");
+
+    // Switch to Generate tab to show pipeline progress
+    setActiveTab("one-click");
+
+    // Send IPC command to build full bundle from idea
+    ipcClient.sendCommand({
+      cmd: "build_full_from_idea",
+      params: { idea_id: ideaId }
+    });
+  };
+
+  const handleNavigateToIdeasLibrary = () => {
+    // Navigate to Library tab with Ideas sub-tab active
+    setLibraryDefaultTab("ideas");
+    setActiveTab("library");
+  };
+
   const handleGenerateAssets = (bundleId: string) => {
     // Reset state for new pipeline run - only show Maker step
     handleRunStart([
@@ -334,6 +360,16 @@ export function AppShell() {
     setRunningMode("auto");
   };
 
+  const handleQuickBuild = () => {
+    // Reset state for quick build pipeline - skip Researcher
+    handleRunStart([
+      { name: "Planner", status: "pending" },
+      { name: "Maker", status: "pending" },
+      { name: "Packager", status: "pending" },
+    ]);
+    setRunningMode("auto");
+  };
+
   const handleOpenFolder = (path: string) => {
     // Send IPC command to open folder in file explorer
     ipcClient.sendCommand({
@@ -352,6 +388,7 @@ export function AppShell() {
             {activeTab === "library" ? (
               <LibraryPanel
                 onBuildBundle={handleCreatePlanFromIdea}
+                onBuildFullBundle={handleBuildFullFromIdea}
                 onGenerateAssets={handleGenerateAssets}
                 onPackageBundle={handlePackageBundle}
                 defaultTab={libraryDefaultTab}
@@ -364,6 +401,8 @@ export function AppShell() {
                   activeTab={activeTab}
                   onResearchOnly={handleResearchOnly}
                   onAutoGenerate={handleAutoGenerate}
+                  onQuickBuild={handleQuickBuild}
+                  onNavigateToLibrary={handleNavigateToIdeasLibrary}
                   isRunning={isPipelineRunning}
                   runningMode={runningMode === "maker" || runningMode === "packager" ? null : runningMode}
                 />

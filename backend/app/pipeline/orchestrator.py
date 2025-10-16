@@ -14,8 +14,8 @@ from uuid import uuid4
 from app.logger import setup_logger
 from app.settings import settings
 from app.database import DatabaseManager, BundleQueries
-from app.database.queries import ActivityLogQueries, CreatedBundleQueries, IdeaQueries
-from app.database.models import ActivityLog, CreatedBundle
+from app.database.queries import ActivityLogQueries, CreatedBundleQueries, IdeaQueries, UsedIdeaQueries
+from app.database.models import ActivityLog, CreatedBundle, UsedIdea
 from app.pipeline.agents.researcher import ResearcherAgent
 from app.pipeline.agents.asset_agents.asset_planner import PlannerAgent
 from app.pipeline.agents.asset_agents.asset_maker import MakerAgent
@@ -34,6 +34,7 @@ class PipelineOrchestrator:
         self.activity_queries = ActivityLogQueries(self.db_manager)
         self.created_bundle_queries = CreatedBundleQueries(self.db_manager)
         self.idea_queries = IdeaQueries(self.db_manager)
+        self.used_idea_queries = UsedIdeaQueries(self.db_manager)
 
         # Initialize agents with database access
         self.researcher = ResearcherAgent(db_manager=self.db_manager)
@@ -305,15 +306,11 @@ class PipelineOrchestrator:
                 # No bundle_id yet for researcher failures
 
             # Update bundle status to failed if we have a bundle_id
+            # Keep current step unchanged - only update status to "failed"
             if bundle_id_to_fail:
-                # Determine which step name to use based on failed_step
-                step_name_mapping = {
-                    "Planner": "asset_planner",
-                    "Maker": "asset_maker",
-                    "Packager": "asset_packager"
-                }
-                current_step = step_name_mapping.get(failed_step, "unknown")
-                self.bundle_queries.update_step(bundle_id_to_fail, current_step, "failed", str(e))
+                bundle_record = self.bundle_queries.get_by_id(bundle_id_to_fail)
+                if bundle_record:
+                    self.bundle_queries.update_step(bundle_id_to_fail, bundle_record.current_step, "failed", str(e))
 
             # Log error
             logger.error(f"Pipeline failed at {failed_step}: {e}")
@@ -401,9 +398,12 @@ class PipelineOrchestrator:
 
             # Update bundle status to failed if we have a bundle_id
             # Planner creates bundle, so we need to check if it was created before failure
+            # Keep current step unchanged - only update status to "failed"
             bundle_id_to_fail = locals().get('planner_result', {}).get('bundle_id')
             if bundle_id_to_fail:
-                self.bundle_queries.update_step(bundle_id_to_fail, "asset_planner", "failed", str(e))
+                bundle_record = self.bundle_queries.get_by_id(bundle_id_to_fail)
+                if bundle_record:
+                    self.bundle_queries.update_step(bundle_id_to_fail, bundle_record.current_step, "failed", str(e))
 
             # Don't re-log the error here since agents already log it with their step name
             # Just emit error event and done status
@@ -511,9 +511,11 @@ class PipelineOrchestrator:
             if 'maker_activity_id' in locals():
                 self.activity_queries.update_completion(maker_activity_id, "failed", str(e))
 
-            # Update bundle status to failed
-            # We have bundle_id as a parameter to this function
-            self.bundle_queries.update_step(bundle_id, "asset_maker", "failed", str(e))
+            # Update bundle status to failed - keep current step unchanged
+            # Maker runs when bundle is at step="maker", so keep it there with status="failed"
+            bundle_record = self.bundle_queries.get_by_id(bundle_id)
+            if bundle_record:
+                self.bundle_queries.update_step(bundle_id, bundle_record.current_step, "failed", str(e))
 
             # Don't re-log the error here since agents already log it with their step name
             # Just emit error event and done status
@@ -656,9 +658,11 @@ class PipelineOrchestrator:
             if 'packager_activity_id' in locals():
                 self.activity_queries.update_completion(packager_activity_id, "failed", str(e))
 
-            # Update bundle status to failed
-            # We have bundle_id as a parameter to this function
-            self.bundle_queries.update_step(bundle_id, "asset_packager", "failed", str(e))
+            # Update bundle status to failed - keep current step unchanged
+            # Packager runs when bundle is at step="packager", so keep it there with status="failed"
+            bundle_record = self.bundle_queries.get_by_id(bundle_id)
+            if bundle_record:
+                self.bundle_queries.update_step(bundle_id, bundle_record.current_step, "failed", str(e))
 
             # Don't re-log the error here since agents already log it with their step name
             # Just emit error event and done status
@@ -667,6 +671,420 @@ class PipelineOrchestrator:
             emit({"event": "error", "step": "Packager", "message": str(e)})
 
             # Emit done event with failure status (don't re-raise)
+            emit({
+                "event": "done",
+                "success": False,
+                "error": str(e)
+            })
+
+    async def run_auto_from_existing_idea(
+        self,
+        emit: Callable[[Dict[str, Any]], None]
+    ):
+        """
+        Run full auto pipeline using best available existing idea
+        Skips research, goes straight to Planner → Maker → Packager
+
+        This is the "Quick Build" flow that uses existing idea inventory
+
+        Args:
+            emit: Callback to send events to frontend
+        """
+        logger.info("Starting quick build from existing idea")
+        emit({"event": "log", "step": "Orchestrator", "message": "Quick Build: Selecting best available idea..."})
+
+        try:
+            # Step 1: Query available ideas (priority A/B, recent 8 weeks)
+            available_ideas = self.idea_queries.get_available_ideas(weeks_back=8, priorities=["A", "B"])
+
+            if not available_ideas:
+                raise ValueError("No available ideas found. Please run research first.")
+
+            # Step 2: Select best idea by priority (A > B) then ROI
+            # Priority is string "A", "B", "C" - A is best
+            priority_rank = {"A": 3, "B": 2, "C": 1}
+            best_idea = max(
+                available_ideas,
+                key=lambda x: (priority_rank.get(x.priority, 0), x.roi_estimate or 0)
+            )
+
+            idea_id = best_idea.idea_id
+            idea_title = best_idea.title
+            emit({"event": "log", "step": "Orchestrator", "message": f"Selected idea: {idea_title} (Priority {best_idea.priority}, ROI: {best_idea.roi_estimate})"})
+
+            # Step 3: Run planner
+            emit({"event": "log", "step": "Planner", "message": "Designing bundle..."})
+            emit({"event": "progress", "step": "Planner", "pct": 0})
+
+            planner_activity_id = f"planner-{uuid4().hex[:8]}"
+            self.activity_queries.create(ActivityLog(
+                activity_id=planner_activity_id,
+                activity_type="planner",
+                bundle_id=None,
+                idea_id=idea_id,
+                started_at=datetime.now().isoformat(),
+                completed_at=None,
+                status="in_progress",
+                duration_seconds=None,
+                error_message=None,
+                metadata_json=json.dumps({"mode": "quick_build"})
+            ))
+
+            loop = asyncio.get_event_loop()
+            planner_result = await loop.run_in_executor(
+                None,
+                partial(self.planner.execute, idea=idea_id, emit=emit)
+            )
+
+            self.activity_queries.update_completion(planner_activity_id, "completed", None)
+            emit({"event": "progress", "step": "Planner", "pct": 100})
+            emit({"event": "log", "step": "Orchestrator", "message": "Bundle planning complete"})
+
+            bundle_id = planner_result.get("bundle_id")
+            bundle_title = planner_result.get("title", "Untitled Bundle")
+
+            # Step 4: Run maker
+            emit({"event": "log", "step": "Maker", "message": "Generating assets..."})
+            emit({"event": "progress", "step": "Maker", "pct": 0})
+
+            maker_activity_id = f"maker-{uuid4().hex[:8]}"
+            self.activity_queries.create(ActivityLog(
+                activity_id=maker_activity_id,
+                activity_type="maker",
+                bundle_id=bundle_id,
+                idea_id=idea_id,
+                started_at=datetime.now().isoformat(),
+                completed_at=None,
+                status="in_progress",
+                duration_seconds=None,
+                error_message=None,
+                metadata_json=json.dumps({"mode": "quick_build"})
+            ))
+
+            maker_result = await loop.run_in_executor(
+                None,
+                partial(self.maker.execute, bundle_id=bundle_id, emit=emit)
+            )
+
+            self.activity_queries.update_completion(maker_activity_id, "completed", None)
+            emit({"event": "progress", "step": "Maker", "pct": 100})
+            emit({"event": "log", "step": "Orchestrator", "message": "Asset generation complete"})
+
+            # Step 5: Run packager
+            emit({"event": "log", "step": "Packager", "message": "Packaging bundle..."})
+            emit({"event": "progress", "step": "Packager", "pct": 0})
+
+            packager_activity_id = f"packager-{uuid4().hex[:8]}"
+            self.activity_queries.create(ActivityLog(
+                activity_id=packager_activity_id,
+                activity_type="packager",
+                bundle_id=bundle_id,
+                idea_id=idea_id,
+                started_at=datetime.now().isoformat(),
+                completed_at=None,
+                status="in_progress",
+                duration_seconds=None,
+                error_message=None,
+                metadata_json=json.dumps({"mode": "quick_build"})
+            ))
+
+            packager_result = await loop.run_in_executor(
+                None,
+                partial(self.packager.execute, bundle_id=bundle_id, emit=emit)
+            )
+
+            self.activity_queries.update_completion(packager_activity_id, "completed", None)
+            emit({"event": "progress", "step": "Packager", "pct": 100})
+            emit({"event": "log", "step": "Orchestrator", "message": "Bundle packaging complete"})
+
+            # Step 6: Archive bundle
+            emit({"event": "log", "step": "Orchestrator", "message": "Archiving bundle..."})
+
+            bundle_record = self.bundle_queries.get_by_id(bundle_id)
+            if not bundle_record:
+                raise ValueError(f"Bundle not found: {bundle_id}")
+
+            planner_data = json.loads(bundle_record.planner_output)
+
+            # Use final output path from packager result
+            final_output_path = packager_result.get("final_output_path")
+            if not final_output_path:
+                bundle_dir = settings.get_bundle_dir(bundle_id)
+                final_output_path = str(bundle_dir)
+
+            created_bundle = CreatedBundle(
+                bundle_id=bundle_id,
+                idea_id=idea_id,
+                created_at=bundle_record.created_at,
+                completed_at=datetime.now().isoformat(),
+                planner_output=bundle_record.planner_output,
+                maker_output=json.dumps({"status": "completed"}),
+                packager_output=json.dumps(packager_result),
+                title=planner_data.get("title", "Untitled Bundle"),
+                niche=planner_data.get("niche", "Unknown"),
+                output_path=final_output_path
+            )
+
+            if not self.created_bundle_queries.create(created_bundle):
+                raise ValueError(f"Failed to archive bundle {bundle_id}")
+
+            # Delete from active bundles table
+            if not self.bundle_queries.delete(bundle_id):
+                logger.warning(f"Bundle archived successfully but failed to remove from active table: {bundle_id}")
+
+            emit({"event": "log", "step": "Orchestrator", "message": "Quick Build complete!"})
+
+            # Emit final done event
+            emit({
+                "event": "done",
+                "success": True,
+                "result": {
+                    "bundle_id": bundle_id,
+                    "bundle_title": bundle_title,
+                    "output_path": final_output_path,
+                    "store_title": packager_result.get("store_title"),
+                    "store_description": packager_result.get("store_description"),
+                    "converted_pdfs": len(packager_result.get("converted_pdfs", [])),
+                    "message": f"Quick Build complete: {packager_result.get('store_title', bundle_title)}",
+                    "mode": "auto"
+                }
+            })
+
+        except Exception as e:
+            # Mark activities as failed and determine which step failed
+            failed_step = "Orchestrator"
+            bundle_id_to_fail = None
+
+            if 'packager_activity_id' in locals():
+                self.activity_queries.update_completion(packager_activity_id, "failed", str(e))
+                failed_step = "Packager"
+                bundle_id_to_fail = locals().get('bundle_id')
+            elif 'maker_activity_id' in locals():
+                self.activity_queries.update_completion(maker_activity_id, "failed", str(e))
+                failed_step = "Maker"
+                bundle_id_to_fail = locals().get('bundle_id')
+            elif 'planner_activity_id' in locals():
+                self.activity_queries.update_completion(planner_activity_id, "failed", str(e))
+                failed_step = "Planner"
+                bundle_id_to_fail = locals().get('bundle_id')
+
+            # Update bundle status to failed if we have a bundle_id
+            # Keep current step unchanged - only update status to "failed"
+            if bundle_id_to_fail:
+                bundle_record = self.bundle_queries.get_by_id(bundle_id_to_fail)
+                if bundle_record:
+                    self.bundle_queries.update_step(bundle_id_to_fail, bundle_record.current_step, "failed", str(e))
+
+            # Log error
+            logger.error(f"Quick Build failed at {failed_step}: {e}")
+
+            # Emit error event with step name
+            emit({"event": "error", "step": failed_step, "message": str(e)})
+
+            # Emit done event with failure status
+            emit({
+                "event": "done",
+                "success": False,
+                "error": str(e)
+            })
+
+    async def run_full_from_idea(
+        self,
+        idea_id: str,
+        emit: Callable[[Dict[str, Any]], None]
+    ):
+        """
+        Run full pipeline (Planner → Maker → Packager) from a specific idea
+        Skips research, uses manually selected idea
+
+        This is the "Browse & Select" flow that gives users full control
+
+        Args:
+            idea_id: ID of the manually selected idea
+            emit: Callback to send events to frontend
+        """
+        logger.info(f"Starting full pipeline from selected idea: {idea_id}")
+        emit({"event": "log", "step": "Orchestrator", "message": f"Building complete bundle from idea {idea_id}..."})
+
+        try:
+            # Step 1: Validate idea exists
+            idea_record = self.idea_queries.get_by_id(idea_id)
+            if not idea_record:
+                raise ValueError(f"Idea not found: {idea_id}")
+
+            idea_title = idea_record.title
+            emit({"event": "log", "step": "Orchestrator", "message": f"Using idea: {idea_title}"})
+
+            # Step 2: Run planner
+            emit({"event": "log", "step": "Planner", "message": "Designing bundle..."})
+            emit({"event": "progress", "step": "Planner", "pct": 0})
+
+            planner_activity_id = f"planner-{uuid4().hex[:8]}"
+            self.activity_queries.create(ActivityLog(
+                activity_id=planner_activity_id,
+                activity_type="planner",
+                bundle_id=None,
+                idea_id=idea_id,
+                started_at=datetime.now().isoformat(),
+                completed_at=None,
+                status="in_progress",
+                duration_seconds=None,
+                error_message=None,
+                metadata_json=json.dumps({"mode": "manual_full_build"})
+            ))
+
+            loop = asyncio.get_event_loop()
+            planner_result = await loop.run_in_executor(
+                None,
+                partial(self.planner.execute, idea=idea_id, emit=emit)
+            )
+
+            self.activity_queries.update_completion(planner_activity_id, "completed", None)
+            emit({"event": "progress", "step": "Planner", "pct": 100})
+            emit({"event": "log", "step": "Orchestrator", "message": "Bundle planning complete"})
+
+            bundle_id = planner_result.get("bundle_id")
+            bundle_title = planner_result.get("title", "Untitled Bundle")
+
+            # Step 3: Run maker
+            emit({"event": "log", "step": "Maker", "message": "Generating assets..."})
+            emit({"event": "progress", "step": "Maker", "pct": 0})
+
+            maker_activity_id = f"maker-{uuid4().hex[:8]}"
+            self.activity_queries.create(ActivityLog(
+                activity_id=maker_activity_id,
+                activity_type="maker",
+                bundle_id=bundle_id,
+                idea_id=idea_id,
+                started_at=datetime.now().isoformat(),
+                completed_at=None,
+                status="in_progress",
+                duration_seconds=None,
+                error_message=None,
+                metadata_json=json.dumps({"mode": "manual_full_build"})
+            ))
+
+            maker_result = await loop.run_in_executor(
+                None,
+                partial(self.maker.execute, bundle_id=bundle_id, emit=emit)
+            )
+
+            self.activity_queries.update_completion(maker_activity_id, "completed", None)
+            emit({"event": "progress", "step": "Maker", "pct": 100})
+            emit({"event": "log", "step": "Orchestrator", "message": "Asset generation complete"})
+
+            # Step 4: Run packager
+            emit({"event": "log", "step": "Packager", "message": "Packaging bundle..."})
+            emit({"event": "progress", "step": "Packager", "pct": 0})
+
+            packager_activity_id = f"packager-{uuid4().hex[:8]}"
+            self.activity_queries.create(ActivityLog(
+                activity_id=packager_activity_id,
+                activity_type="packager",
+                bundle_id=bundle_id,
+                idea_id=idea_id,
+                started_at=datetime.now().isoformat(),
+                completed_at=None,
+                status="in_progress",
+                duration_seconds=None,
+                error_message=None,
+                metadata_json=json.dumps({"mode": "manual_full_build"})
+            ))
+
+            packager_result = await loop.run_in_executor(
+                None,
+                partial(self.packager.execute, bundle_id=bundle_id, emit=emit)
+            )
+
+            self.activity_queries.update_completion(packager_activity_id, "completed", None)
+            emit({"event": "progress", "step": "Packager", "pct": 100})
+            emit({"event": "log", "step": "Orchestrator", "message": "Bundle packaging complete"})
+
+            # Step 5: Archive bundle
+            emit({"event": "log", "step": "Orchestrator", "message": "Archiving bundle..."})
+
+            bundle_record = self.bundle_queries.get_by_id(bundle_id)
+            if not bundle_record:
+                raise ValueError(f"Bundle not found: {bundle_id}")
+
+            planner_data = json.loads(bundle_record.planner_output)
+
+            # Use final output path from packager result
+            final_output_path = packager_result.get("final_output_path")
+            if not final_output_path:
+                bundle_dir = settings.get_bundle_dir(bundle_id)
+                final_output_path = str(bundle_dir)
+
+            created_bundle = CreatedBundle(
+                bundle_id=bundle_id,
+                idea_id=idea_id,
+                created_at=bundle_record.created_at,
+                completed_at=datetime.now().isoformat(),
+                planner_output=bundle_record.planner_output,
+                maker_output=json.dumps({"status": "completed"}),
+                packager_output=json.dumps(packager_result),
+                title=planner_data.get("title", "Untitled Bundle"),
+                niche=planner_data.get("niche", "Unknown"),
+                output_path=final_output_path
+            )
+
+            if not self.created_bundle_queries.create(created_bundle):
+                raise ValueError(f"Failed to archive bundle {bundle_id}")
+
+            # Delete from active bundles table
+            if not self.bundle_queries.delete(bundle_id):
+                logger.warning(f"Bundle archived successfully but failed to remove from active table: {bundle_id}")
+
+            emit({"event": "log", "step": "Orchestrator", "message": "Complete bundle generated!"})
+
+            # Emit final done event
+            emit({
+                "event": "done",
+                "success": True,
+                "result": {
+                    "bundle_id": bundle_id,
+                    "bundle_title": bundle_title,
+                    "output_path": final_output_path,
+                    "store_title": packager_result.get("store_title"),
+                    "store_description": packager_result.get("store_description"),
+                    "converted_pdfs": len(packager_result.get("converted_pdfs", [])),
+                    "message": f"Complete bundle generated: {packager_result.get('store_title', bundle_title)}",
+                    "mode": "auto"
+                }
+            })
+
+        except Exception as e:
+            # Mark activities as failed and determine which step failed
+            failed_step = "Orchestrator"
+            bundle_id_to_fail = None
+
+            if 'packager_activity_id' in locals():
+                self.activity_queries.update_completion(packager_activity_id, "failed", str(e))
+                failed_step = "Packager"
+                bundle_id_to_fail = locals().get('bundle_id')
+            elif 'maker_activity_id' in locals():
+                self.activity_queries.update_completion(maker_activity_id, "failed", str(e))
+                failed_step = "Maker"
+                bundle_id_to_fail = locals().get('bundle_id')
+            elif 'planner_activity_id' in locals():
+                self.activity_queries.update_completion(planner_activity_id, "failed", str(e))
+                failed_step = "Planner"
+                bundle_id_to_fail = locals().get('bundle_id')
+
+            # Update bundle status to failed if we have a bundle_id
+            # Keep current step unchanged - only update status to "failed"
+            if bundle_id_to_fail:
+                bundle_record = self.bundle_queries.get_by_id(bundle_id_to_fail)
+                if bundle_record:
+                    self.bundle_queries.update_step(bundle_id_to_fail, bundle_record.current_step, "failed", str(e))
+
+            # Log error
+            logger.error(f"Manual full build failed at {failed_step}: {e}")
+
+            # Emit error event with step name
+            emit({"event": "error", "step": failed_step, "message": str(e)})
+
+            # Emit done event with failure status
             emit({
                 "event": "done",
                 "success": False,

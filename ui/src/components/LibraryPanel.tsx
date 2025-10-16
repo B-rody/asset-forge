@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Database, Lightbulb, Package, Sparkles } from "lucide-react";
 import { ipcClient } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
@@ -14,12 +14,13 @@ interface LibraryStats {
 
 interface LibraryPanelProps {
   onBuildBundle?: (ideaId: string) => void;
+  onBuildFullBundle?: (ideaId: string) => void;
   onGenerateAssets?: (bundleId: string) => void;
   onPackageBundle?: (bundleId: string) => void;
   defaultTab?: LibraryTab;
 }
 
-export function LibraryPanel({ onBuildBundle, onGenerateAssets, onPackageBundle, defaultTab }: LibraryPanelProps) {
+export function LibraryPanel({ onBuildBundle, onBuildFullBundle, onGenerateAssets, onPackageBundle, defaultTab }: LibraryPanelProps) {
   const [activeTab, setActiveTab] = useState<LibraryTab>(defaultTab || "ideas");
   const [stats, setStats] = useState<LibraryStats>({ ideas_count: 0, bundles_count: 0 });
 
@@ -122,7 +123,7 @@ export function LibraryPanel({ onBuildBundle, onGenerateAssets, onPackageBundle,
 
       {/* Content */}
       <div>
-        {activeTab === "ideas" && <IdeasView onBuildBundle={onBuildBundle} />}
+        {activeTab === "ideas" && <IdeasView onBuildBundle={onBuildBundle} onBuildFullBundle={onBuildFullBundle} />}
         {activeTab === "ready" && (
           <BundlesView
             fetchCommand="get_ready_bundles"

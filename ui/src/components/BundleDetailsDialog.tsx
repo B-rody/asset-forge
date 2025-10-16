@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { X, Package, DollarSign, Tag, FileText, XCircle, Trash2, AlertTriangle, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getDisplayStatus } from "@/lib/bundle-status";

@@ -4,6 +4,7 @@ Generates digital product assets with built-in self-QA validation
 """
 
 import json
+import re
 from typing import Dict, Any, Callable, Optional, Union, TYPE_CHECKING
 from datetime import datetime
 from pathlib import Path
@@ -11,6 +12,41 @@ from app.pipeline.agents.base_agent import BaseAgent
 
 if TYPE_CHECKING:
     from app.database.db import DatabaseManager
+
+
+def sanitize_filename(name: str) -> str:
+    """
+    Sanitize a string to be safe for use in Windows/Unix filenames.
+
+    Removes or replaces characters that are invalid in Windows paths:
+    < > : " / \ | ? *
+
+    Also removes control characters and collapses multiple dashes/spaces.
+
+    Args:
+        name: The filename or directory name to sanitize
+
+    Returns:
+        Sanitized string safe for filesystem use
+    """
+    # Replace Windows-invalid characters with dash
+    # Invalid chars: < > : " / \ | ? * and control characters (0-31)
+    sanitized = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '-', name)
+
+    # Replace multiple spaces/dashes with single dash
+    sanitized = re.sub(r'[-\s]+', '-', sanitized)
+
+    # Remove leading/trailing dashes and spaces
+    sanitized = sanitized.strip('- ')
+
+    # Convert to lowercase for consistency
+    sanitized = sanitized.lower()
+
+    # Ensure we have something left (fallback to "asset" if empty)
+    if not sanitized:
+        sanitized = "asset"
+
+    return sanitized
 
 
 class MakerAgent(BaseAgent):
@@ -68,7 +104,8 @@ class MakerAgent(BaseAgent):
 
                 # Create subdirectory for this asset
                 # Format: asset-001-weekly-planner
-                safe_asset_name = asset_name.replace(" ", "-").lower()
+                # Use sanitization to remove Windows-invalid characters (: / \ etc)
+                safe_asset_name = sanitize_filename(asset_name)
                 asset_dir = base_output_dir / f"{asset_id}-{safe_asset_name}"
                 asset_dir.mkdir(parents=True, exist_ok=True)
 
@@ -352,12 +389,12 @@ class MakerAgent(BaseAgent):
         try:
             self.logger.info(f"Updating bundle status for: {bundle_id}")
 
-            # Update Bundle to set current_step="maker" and status="completed"
-            if not self.bundle_queries.update_step(bundle_id, "maker", "completed"):
+            # Update Bundle to advance to packager step with pending status
+            if not self.bundle_queries.update_step(bundle_id, "packager", "pending"):
                 self.logger.error(f"Failed to update bundle step: {bundle_id}")
                 return False
 
-            self.logger.info(f"✓ Bundle step updated: {bundle_id} -> maker (completed)")
+            self.logger.info(f"✓ Bundle step updated: {bundle_id} -> packager (pending)")
             return True
 
         except Exception as e:

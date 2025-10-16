@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Activity, CheckCircle2, XCircle, Clock, Lightbulb, FileText, Package as PackageIcon, Box } from "lucide-react";
 import { ipcClient } from "@/lib/ipc";
-import { cn } from "@/lib/utils";
 
 interface ActivityLog {
   activity_id: string;
@@ -85,7 +84,7 @@ export function ActivityLogView() {
 
   // Format duration
   const formatDuration = (seconds: number | null) => {
-    if (!seconds) return "—";
+    if (!seconds || seconds < 0) return "—";
     if (seconds < 60) return `${seconds}s`;
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;

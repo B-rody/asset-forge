@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { Zap, History, Database } from "lucide-react";
 import { cn } from "@/lib/utils";
 

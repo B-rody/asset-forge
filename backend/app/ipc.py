@@ -72,6 +72,21 @@ class IPCServer:
 
             await self.orchestrator.run_from_idea(idea_id, self.emit_event)
 
+        elif cmd == "build_full_from_idea":
+            # Full pipeline from manually selected idea
+            # Runs Planner → Maker → Packager for a specific idea
+            params = command.get("params", {})
+            idea_id = params.get("idea_id")
+
+            if not idea_id:
+                self.emit_error(None, "No idea_id provided")
+                return
+
+            # Use real orchestrator for full build from idea
+            self._set_orchestrator(False)
+
+            await self.orchestrator.run_full_from_idea(idea_id, self.emit_event)
+
         elif cmd == "generate_assets_from_bundle":
             params = command.get("params", {})
             bundle_id = params.get("bundle_id")
@@ -97,6 +112,40 @@ class IPCServer:
             self._set_orchestrator(False)
 
             await self.orchestrator.run_packager_from_bundle(bundle_id, self.emit_event)
+
+        elif cmd == "quick_build_from_existing":
+            # Quick Build: Auto pipeline using best available existing idea
+            # Skips research, goes straight to Planner → Maker → Packager
+
+            # Use real orchestrator for quick build
+            self._set_orchestrator(False)
+
+            await self.orchestrator.run_auto_from_existing_idea(self.emit_event)
+
+        elif cmd == "get_available_ideas_count":
+            try:
+                logger.info("Handling get_available_ideas_count command")
+
+                # Ensure orchestrator is initialized
+                self._set_orchestrator(False)
+
+                from app.database.queries import IdeaQueries
+                idea_queries = IdeaQueries(self.orchestrator.db_manager)
+
+                # Get available ideas (priority A/B, recent 8 weeks)
+                available_ideas = idea_queries.get_available_ideas(weeks_back=8, priorities=["A", "B"])
+                count = len(available_ideas)
+
+                logger.info(f"Found {count} available ideas")
+
+                self.emit_event({
+                    "event": "available_ideas_count",
+                    "count": count
+                })
+
+            except Exception as e:
+                logger.error(f"Failed to get available ideas count: {e}", exc_info=True)
+                self.emit_error(None, f"Failed to get available ideas count: {str(e)}")
 
         elif cmd == "re_run_step":
             params = command.get("params", {})

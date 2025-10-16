@@ -204,8 +204,8 @@ class PlannerAgent(BaseAgent):
                 idea_id=idea_id,
                 created_at=result.get("generated_at", datetime.now().isoformat()),
                 updated_at=datetime.now().isoformat(),
-                current_step="planner",
-                status="completed",
+                current_step="maker",
+                status="pending",
                 error_message=None,
                 planner_output=json.dumps(result)  # Store full planner output as JSON
             )

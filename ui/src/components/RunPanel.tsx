@@ -1,11 +1,16 @@
-import React, { useState, useEffect } from "react";
-import { Zap, FolderOpen, Target, Search } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Zap, FolderOpen, Target, Search, ChevronDown } from "lucide-react";
 import { open } from "@tauri-apps/api/dialog";
 import { open as openPath } from "@tauri-apps/api/shell";
 import { ipcClient } from "@/lib/ipc";
-import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type TabId = "one-click" | "history";
 
@@ -13,17 +18,20 @@ interface RunPanelProps {
   activeTab: TabId;
   onResearchOnly?: () => void;
   onAutoGenerate?: () => void;
+  onQuickBuild?: () => void;
+  onNavigateToLibrary?: () => void;
   isRunning: boolean;
   runningMode?: "research" | "auto" | "plan" | null;
 }
 
-export function RunPanel({ activeTab, onResearchOnly, onAutoGenerate, isRunning, runningMode }: RunPanelProps) {
+export function RunPanel({ activeTab, onResearchOnly, onAutoGenerate, onQuickBuild, onNavigateToLibrary, isRunning, runningMode }: RunPanelProps) {
   const [useFocusedMode, setUseFocusedMode] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [outputFolder, setOutputFolder] = useState("");
   const [defaultOutputFolder, setDefaultOutputFolder] = useState("");
   const [isCustomPath, setIsCustomPath] = useState(false);
   const [mockMode, setMockMode] = useState(false);
+  const [availableIdeasCount, setAvailableIdeasCount] = useState(0);
 
   // Load output folder on mount
   useEffect(() => {
@@ -47,6 +55,26 @@ export function RunPanel({ activeTab, onResearchOnly, onAutoGenerate, isRunning,
     };
 
     loadOutputFolder();
+  }, []);
+
+  // Load available ideas count on mount
+  useEffect(() => {
+    const loadIdeasCount = async () => {
+      const unsubscribe = ipcClient.subscribe((event) => {
+        if (event.event === "available_ideas_count") {
+          unsubscribe();
+          setAvailableIdeasCount(event.count || 0);
+        }
+      });
+
+      await ipcClient.sendCommand({ cmd: "get_available_ideas_count" });
+
+      setTimeout(() => {
+        unsubscribe();
+      }, 2000);
+    };
+
+    loadIdeasCount();
   }, []);
 
   const handleBrowseFolder = async () => {
@@ -200,6 +228,31 @@ export function RunPanel({ activeTab, onResearchOnly, onAutoGenerate, isRunning,
     }
   };
 
+  const handleQuickBuildRun = async () => {
+    // Check if API key exists (always required for quick build - no mock mode)
+    try {
+      const hasKey = await checkApiKey();
+      if (!hasKey) {
+        alert("Please add your OpenAI API key in Settings before running the pipeline.");
+        return;
+      }
+    } catch (error) {
+      console.error("Failed to check API key:", error);
+      alert("Failed to verify API key. Please check your settings.");
+      return;
+    }
+
+    if (onQuickBuild) {
+      onQuickBuild();
+    }
+
+    // Send quick build command
+    await ipcClient.sendCommand({
+      cmd: "quick_build_from_existing",
+      params: {}
+    });
+  };
+
   const checkApiKey = async (): Promise<boolean> => {
     return new Promise((resolve) => {
       let resolved = false;
@@ -299,6 +352,9 @@ export function RunPanel({ activeTab, onResearchOnly, onAutoGenerate, isRunning,
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 )}
               />
+              <p className="text-xs text-muted-foreground">
+                This constrains the <span className="font-medium">research step</span> to focus on your specified niche. Applies to research operations only.
+              </p>
             </div>
           )}
 
@@ -426,51 +482,109 @@ export function RunPanel({ activeTab, onResearchOnly, onAutoGenerate, isRunning,
               </div>
             </button>
 
-            {/* Generate Bundle (Auto) Button */}
-            <button
-              type="button"
-              onClick={isRunning ? undefined : handleRun}
-              disabled={isRunning && runningMode !== "auto"}
-              className={cn(
-                "w-full relative overflow-hidden p-4 rounded-lg",
-                "transition-all duration-[250ms] ease-in-out",
-                "focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2",
-                "dark:focus-visible:ring-offset-slate-900",
-                "bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500",
-                // Hover state (when not running)
-                !isRunning && "hover:brightness-110 hover:shadow-[0_0_12px_#2563eb80]",
-                // Active/Generating state (only when this button is running)
-                runningMode === "auto" && [
-                  "animate-gradient-shift",
-                  "brightness-125",
-                  "shadow-[0_0_24px_rgba(37,99,235,1)]",
-                  "scale-[1.02]",
-                  "pointer-events-none",
-                  "cursor-not-allowed"
-                ],
-                // Disabled state
-                "disabled:opacity-50 disabled:cursor-not-allowed"
-              )}
-            >
-              {/* Pulsing inner glow when generating */}
-              {runningMode === "auto" && (
-                <span className="absolute inset-0 bg-[radial-gradient(circle,_rgba(59,130,246,0.5)_0%,_transparent_70%)] animate-pulse rounded-lg" />
-              )}
+            {/* Generate Bundle (Smart Auto) Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild disabled={isRunning && runningMode !== "auto"}>
+                <button
+                  type="button"
+                  disabled={isRunning && runningMode !== "auto"}
+                  className={cn(
+                    "w-full relative overflow-hidden p-4 rounded-lg",
+                    "transition-all duration-[250ms] ease-in-out",
+                    "focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2",
+                    "dark:focus-visible:ring-offset-slate-900",
+                    "bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500",
+                    // Hover state (when not running)
+                    !isRunning && "hover:brightness-110 hover:shadow-[0_0_12px_#2563eb80]",
+                    // Active/Generating state (only when this button is running)
+                    runningMode === "auto" && [
+                      "animate-gradient-shift",
+                      "brightness-125",
+                      "shadow-[0_0_24px_rgba(37,99,235,1)]",
+                      "scale-[1.02]",
+                      "pointer-events-none",
+                      "cursor-not-allowed"
+                    ],
+                    // Disabled state
+                    "disabled:opacity-50 disabled:cursor-not-allowed"
+                  )}
+                >
+                  {/* Pulsing inner glow when generating */}
+                  {runningMode === "auto" && (
+                    <span className="absolute inset-0 bg-[radial-gradient(circle,_rgba(59,130,246,0.5)_0%,_transparent_70%)] animate-pulse rounded-lg" />
+                  )}
 
-              <div className={cn(
-                "relative flex items-center gap-3 text-white"
-              )}>
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20">
-                  <Zap className="h-5 w-5" />
-                </div>
-                <div className="flex-1 text-left">
-                  <div className="font-semibold">
-                    {runningMode === "auto" ? "Generating…" : "Generate Bundle (Auto)"}
+                  <div className={cn(
+                    "relative flex items-center gap-3 text-white"
+                  )}>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20">
+                      <Zap className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <div className="font-semibold">
+                        {runningMode === "auto" ? "Generating…" : "Generate Bundle"}
+                      </div>
+                      <div className="text-xs opacity-90">
+                        {availableIdeasCount > 0
+                          ? `${availableIdeasCount} ideas ready • Choose mode below`
+                          : "Full pipeline with auto-research"}
+                      </div>
+                    </div>
+                    {!isRunning && (
+                      <ChevronDown className="h-5 w-5 opacity-80" />
+                    )}
                   </div>
-                  <div className="text-xs opacity-90">Full pipeline, AI picks best idea</div>
-                </div>
-              </div>
-            </button>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-[400px]" align="end">
+                {availableIdeasCount > 0 && (
+                  <>
+                    <DropdownMenuItem
+                      onClick={handleQuickBuildRun}
+                      className="cursor-pointer py-3"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="text-lg">⚡</div>
+                        <div className="flex-1">
+                          <div className="font-semibold">Quick Build (Auto-Pick)</div>
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            Automatically select best idea • Skip research
+                          </div>
+                        </div>
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={onNavigateToLibrary}
+                      className="cursor-pointer py-3"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="text-lg">📋</div>
+                        <div className="flex-1">
+                          <div className="font-semibold">Browse & Select Idea</div>
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            Manually pick from {availableIdeasCount} {availableIdeasCount === 1 ? 'idea' : 'ideas'} • Full control
+                          </div>
+                        </div>
+                      </div>
+                    </DropdownMenuItem>
+                  </>
+                )}
+                <DropdownMenuItem
+                  onClick={isRunning ? undefined : handleRun}
+                  className="cursor-pointer py-3"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="text-lg">🔍</div>
+                    <div className="flex-1">
+                      <div className="font-semibold">Research & Auto-Build (Thorough)</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        Full pipeline • Research new ideas first
+                      </div>
+                    </div>
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       )}

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { History, Activity, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ActivityLogView } from "./ActivityLogView";

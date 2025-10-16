@@ -26,13 +26,25 @@ export interface IPCEvent {
   default_path?: string;
   is_custom?: boolean;
   path?: string;
+  count?: number;
+  has_key?: boolean;
+  research_only?: boolean;
+  // Data arrays
+  ideas?: any[];
+  bundles?: any[];
+  activities?: any[];
+  sessions?: any[];
+  // Stats object
+  stats?: any;
+  // IDs
+  idea_id?: string;
+  bundle_id?: string;
 }
 
 export type IPCEventHandler = (event: IPCEvent) => void;
 
 class IPCClient {
   private handlers: Set<IPCEventHandler> = new Set();
-  private tauriUnlisten: (() => void) | null = null;
 
   constructor() {
     // Listen to backend events from Tauri
@@ -44,14 +56,14 @@ class IPCClient {
    */
   private async setupTauriEventListener() {
     try {
-      const unlisten = await listen<IPCEvent>("backend_event", (event) => {
+      await listen<IPCEvent>("backend_event", (event) => {
         // Debug logging to see all backend events
         console.log("📨 Backend event:", event.payload);
 
         // Forward event to all subscribed handlers
         this.emit(event.payload);
       });
-      this.tauriUnlisten = unlisten;
+      // Note: unlisten function intentionally not stored - event listener persists for app lifetime
     } catch (error) {
       console.error("Failed to setup Tauri event listener:", error);
     }

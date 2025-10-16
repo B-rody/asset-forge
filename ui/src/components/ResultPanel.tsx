@@ -1,4 +1,3 @@
-import React from "react";
 import { CheckCircle2, XCircle, FolderOpen, Clock, FileText, Sparkles, Package, Lightbulb } from "lucide-react";
 import { open as openPath } from "@tauri-apps/api/shell";
 import { cn } from "@/lib/utils";
@@ -210,7 +209,7 @@ export function ResultPanel({ result, onGenerateAssets, onPackageBundle, onNavig
             )}
 
             {/* Packager Mode: Open in Explorer */}
-            {result.mode === "packager" && result.output_path && (
+            {(result.mode === "packager" || result.mode === "auto") && result.output_path && (
               <button
                 onClick={handleOpenFolder}
                 className={cn(

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Lightbulb, Filter, ArrowUpDown, Info, CheckSquare, Trash2 } from "lucide-react";
 import { ipcClient } from "@/lib/ipc";
 import { IdeaCard } from "./IdeaCard";
@@ -22,9 +22,10 @@ type FilterOption = "all" | "A" | "B" | "C";
 
 interface IdeasViewProps {
   onBuildBundle?: (ideaId: string) => void;
+  onBuildFullBundle?: (ideaId: string) => void;
 }
 
-export function IdeasView({ onBuildBundle }: IdeasViewProps = {}) {
+export function IdeasView({ onBuildBundle, onBuildFullBundle }: IdeasViewProps = {}) {
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<SortOption>("roi_desc");
@@ -39,12 +40,13 @@ export function IdeasView({ onBuildBundle }: IdeasViewProps = {}) {
       if (event.event === "ideas_list") {
         setIdeas(event.ideas || []);
         setLoading(false);
-      } else if (event.event === "idea_deleted" && event.success) {
+      } else if (event.event === "idea_deleted" && event.success && event.idea_id) {
         // Remove deleted idea from list
-        setIdeas((prev) => prev.filter((idea) => idea.idea_id !== event.idea_id));
+        const ideaId = event.idea_id;
+        setIdeas((prev) => prev.filter((idea) => idea.idea_id !== ideaId));
         setSelectedIds((prev) => {
           const newSet = new Set(prev);
-          newSet.delete(event.idea_id);
+          newSet.delete(ideaId);
           return newSet;
         });
       }
@@ -271,6 +273,7 @@ export function IdeasView({ onBuildBundle }: IdeasViewProps = {}) {
                 <IdeaCard
                   idea={idea}
                   onBuildBundle={onBuildBundle}
+                  onBuildFullBundle={onBuildFullBundle}
                   onDelete={handleSingleDelete}
                 />
               )}

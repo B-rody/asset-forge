@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Package, Filter, ArrowUpDown, CheckSquare, Trash2 } from "lucide-react";
 import { ipcClient } from "@/lib/ipc";
 import { BundleCard } from "./BundleCard";
@@ -50,12 +50,13 @@ export function BundlesView({
           event.event === "generated_bundles_list") {
         setBundles(event.bundles || []);
         setLoading(false);
-      } else if (event.event === "bundle_deleted" && event.success) {
+      } else if (event.event === "bundle_deleted" && event.success && event.bundle_id) {
         // Remove deleted bundle from list
-        setBundles((prev) => prev.filter((bundle) => bundle.bundle_id !== event.bundle_id));
+        const bundleId = event.bundle_id;
+        setBundles((prev) => prev.filter((bundle) => bundle.bundle_id !== bundleId));
         setSelectedIds((prev) => {
           const newSet = new Set(prev);
-          newSet.delete(event.bundle_id);
+          newSet.delete(bundleId);
           return newSet;
         });
       }

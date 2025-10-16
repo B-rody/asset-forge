@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState, useEffect } from "react";
 import { Moon, Sun, Key } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SettingsDialog } from "./SettingsDialog";
@@ -10,12 +10,12 @@ export function HeaderBar() {
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
 
   // Set dark mode on initial load
-  React.useEffect(() => {
+  useEffect(() => {
     document.documentElement.classList.add("dark");
   }, []);
 
   // Check for API key on mount
-  React.useEffect(() => {
+  useEffect(() => {
     checkApiKey();
   }, []);
 
@@ -53,9 +53,11 @@ export function HeaderBar() {
       <header className="border-b border-border bg-background px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-lg">
-              AF
-            </div>
+            <img
+              src="/app-icon.png"
+              alt="AssetForge"
+              className="h-10 w-10 rounded-lg"
+            />
             <div>
               <h1 className="text-xl font-bold">AssetForge</h1>
               <p className="text-xs text-muted-foreground">

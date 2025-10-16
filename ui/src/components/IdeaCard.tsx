@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Lightbulb, TrendingUp, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { IdeaDetailsDialog } from "./IdeaDetailsDialog";
@@ -16,10 +16,11 @@ interface IdeaCardProps {
     idea_json: string;
   };
   onBuildBundle?: (ideaId: string) => void;
+  onBuildFullBundle?: (ideaId: string) => void;
   onDelete?: (ideaId: string) => Promise<void>;
 }
 
-export function IdeaCard({ idea, onBuildBundle, onDelete }: IdeaCardProps) {
+export function IdeaCard({ idea, onBuildBundle, onBuildFullBundle, onDelete }: IdeaCardProps) {
   const [showDetails, setShowDetails] = useState(false);
 
   // Priority badge colors
@@ -89,6 +90,7 @@ export function IdeaCard({ idea, onBuildBundle, onDelete }: IdeaCardProps) {
         open={showDetails}
         onOpenChange={setShowDetails}
         onBuildBundle={onBuildBundle}
+        onBuildFullBundle={onBuildFullBundle}
         onDelete={onDelete}
       />
     </>
