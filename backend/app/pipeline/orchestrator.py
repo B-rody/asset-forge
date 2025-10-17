@@ -312,8 +312,8 @@ class PipelineOrchestrator:
                 if bundle_record:
                     self.bundle_queries.update_step(bundle_id_to_fail, bundle_record.current_step, "failed", str(e))
 
-            # Log error
-            logger.error(f"Pipeline failed at {failed_step}: {e}")
+            # Don't re-log the error here since agents already log it with their step name
+            # Just emit error event and done status
 
             # Emit error event with step name for log display
             emit({"event": "error", "step": failed_step, "message": str(e)})
@@ -875,8 +875,8 @@ class PipelineOrchestrator:
                 if bundle_record:
                     self.bundle_queries.update_step(bundle_id_to_fail, bundle_record.current_step, "failed", str(e))
 
-            # Log error
-            logger.error(f"Quick Build failed at {failed_step}: {e}")
+            # Don't re-log the error here since agents already log it with their step name
+            # Just emit error event and done status
 
             # Emit error event with step name
             emit({"event": "error", "step": failed_step, "message": str(e)})
@@ -1078,8 +1078,8 @@ class PipelineOrchestrator:
                 if bundle_record:
                     self.bundle_queries.update_step(bundle_id_to_fail, bundle_record.current_step, "failed", str(e))
 
-            # Log error
-            logger.error(f"Manual full build failed at {failed_step}: {e}")
+            # Don't re-log the error here since agents already log it with their step name
+            # Just emit error event and done status
 
             # Emit error event with step name
             emit({"event": "error", "step": failed_step, "message": str(e)})

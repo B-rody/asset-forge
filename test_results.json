@@ -1,0 +1,54 @@
+{
+  "timestamp": "2025-10-16T21:59:22.298085",
+  "passed": [
+    {
+      "test": "Database Connection",
+      "details": "Connected to C:\\Users\\Brody\\AppData\\Local\\AssetForge\\history.db"
+    },
+    {
+      "test": "Database Integrity",
+      "details": "No orphaned records found"
+    },
+    {
+      "test": "Current Database State",
+      "details": "Ideas: 16 (A:5, B:11, C:0)\n        Active Bundles: 0 (completed:0, failed:0, in_progress:0)\n        Created Bundles: 8\n        Activity Logs: 32"
+    },
+    {
+      "test": "File Structure",
+      "details": "Data: C:\\Users\\Brody\\AppData\\Local\\AssetForge, Output: C:\\Users\\Brody\\AppData\\Local\\AssetForge\\output, Bundles: 2"
+    },
+    {
+      "test": "Bundle State Transitions",
+      "details": "All 0 bundles have valid states"
+    },
+    {
+      "test": "Bundle Archiving",
+      "details": "All 8 created bundles have output_path"
+    },
+    {
+      "test": "Quick Build Availability",
+      "details": "16 ideas available, best: Open House QR Sign\u2011In + Follow\u2011Up Kit (Canva + Google Form) (Priority A, ROI: 5.44)"
+    }
+  ],
+  "failed": [
+    {
+      "test": "Database Tables",
+      "error": "'DatabaseManager' object has no attribute '_get_connection'"
+    },
+    {
+      "test": "Activity Log Completeness",
+      "error": "Found 1 incomplete activity logs (may indicate crashes)"
+    },
+    {
+      "test": "Duplicate Prevention Logic",
+      "error": "cannot import name 'ResearchSessionQueries' from 'app.database.queries' (C:\\Workspace\\asset-forge\\backend\\app\\database\\queries.py)"
+    },
+    {
+      "test": "Quick Build Availability",
+      "error": "'charmap' codec can't encode character '\\u2011' in position 47: character maps to <undefined>"
+    }
+  ],
+  "skipped": [],
+  "total": 11,
+  "success_rate": 63.63636363636363
+}
