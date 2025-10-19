@@ -186,15 +186,33 @@ class PlannerAgent(BaseAgent):
 
         try:
             from app.database.models import Bundle, UsedIdea, Idea
+            import re
 
-            bundle_id = result.get("bundle_id")
-            idea_id = result.get("idea_id") or idea_data.get("idea_id")
-
-            if not bundle_id or not idea_id:
-                self.logger.error("Missing bundle_id or idea_id in planner output")
+            # IMPORTANT: Always use idea_id from input (idea_data), never trust AI's response
+            # The AI may generate a different format or incorrect ID
+            idea_id = idea_data.get("idea_id")
+            if not idea_id:
+                self.logger.error("Missing idea_id in idea_data")
                 return False
 
+            # Generate bundle_id in backend using timestamp pattern (don't trust AI)
+            # Format: bundle-YYYY-MM-DD-{slug} (e.g., bundle-2025-10-18-low-fodmap-reintro)
+            timestamp = datetime.now()
+            date_str = timestamp.strftime("%Y-%m-%d")
+
+            # Create slug from bundle title (from AI response)
+            bundle_title = result.get("title", "untitled-bundle")
+            # Sanitize title to create URL-safe slug
+            slug = re.sub(r'[^a-z0-9]+', '-', bundle_title.lower())
+            slug = slug.strip('-')[:50]  # Limit length
+
+            bundle_id = f"bundle-{date_str}-{slug}"
+
             self.logger.info(f"Starting database save: bundle {bundle_id} from idea {idea_id}")
+
+            # Inject backend-generated IDs into result dict (overwrite any AI-generated IDs)
+            result["bundle_id"] = bundle_id
+            result["idea_id"] = idea_id
 
             # 1. Create Bundle record
             self.logger.debug(f"Creating bundle: {bundle_id}")

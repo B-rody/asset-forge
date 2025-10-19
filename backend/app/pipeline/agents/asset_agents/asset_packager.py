@@ -342,6 +342,69 @@ class PackagerAgent(BaseAgent):
 
         return json.dumps(input_data, indent=2)
 
+    def _sanitize_markdown_images(self, md_file: Path, emit: Callable[[Dict[str, Any]], None]) -> bool:
+        """
+        Sanitize markdown file by removing malformed image syntax that breaks Pandoc.
+
+        Detects and removes patterns like:
+        - ![](Alt text: description)  # alt text in path position
+        - ![Alt text: description]()  # empty path
+        - Other malformed image references
+
+        Args:
+            md_file: Path to markdown file to sanitize
+            emit: Callback for progress updates
+
+        Returns:
+            bool: True if file was modified, False otherwise
+        """
+        import re
+
+        try:
+            # Read the markdown content
+            with open(md_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+
+            original_content = content
+
+            # Pattern 1: ![](Alt text: ...) - alt text in path position
+            # This matches ![](...) where the path starts with "Alt text:" (case insensitive)
+            pattern1 = r'!\[\]\((?:Alt\s+text:\s*[^)]*)\)'
+            matches1 = re.findall(pattern1, content, re.IGNORECASE)
+            if matches1:
+                self.logger.warning(f"Found {len(matches1)} malformed image reference(s) in {md_file.name}")
+                emit({"event": "log", "step": self.step_name, "message": f"⚠ Sanitizing {len(matches1)} malformed image(s) in {md_file.name}"})
+                content = re.sub(pattern1, '', content, flags=re.IGNORECASE)
+
+            # Pattern 2: ![Alt text: ...]() - descriptive alt text with empty path
+            pattern2 = r'!\[Alt\s+text:\s*[^\]]*\]\(\s*\)'
+            matches2 = re.findall(pattern2, content, re.IGNORECASE)
+            if matches2:
+                self.logger.warning(f"Found {len(matches2)} image(s) with empty paths in {md_file.name}")
+                emit({"event": "log", "step": self.step_name, "message": f"⚠ Removing {len(matches2)} image(s) with empty paths in {md_file.name}"})
+                content = re.sub(pattern2, '', content, flags=re.IGNORECASE)
+
+            # Pattern 3: Any remaining ![...]() with empty or whitespace-only path
+            pattern3 = r'!\[[^\]]*\]\(\s*\)'
+            matches3 = re.findall(pattern3, content)
+            if matches3:
+                self.logger.warning(f"Found {len(matches3)} image(s) with empty paths in {md_file.name}")
+                content = re.sub(pattern3, '', content)
+
+            # If content was modified, write it back
+            if content != original_content:
+                with open(md_file, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                self.logger.info(f"✓ Sanitized markdown file: {md_file.name}")
+                return True
+
+            return False
+
+        except Exception as e:
+            self.logger.error(f"Failed to sanitize {md_file.name}: {e}")
+            emit({"event": "log", "step": self.step_name, "message": f"⚠ Failed to sanitize {md_file.name}"})
+            return False
+
     def _convert_markdown_to_pdf(
         self,
         maker_output_dir: Path,
@@ -356,8 +419,12 @@ class PackagerAgent(BaseAgent):
 
         Returns:
             List of converted PDF file paths
+
+        Raises:
+            ValueError: If any markdown files fail to convert to PDF
         """
         converted_pdfs = []
+        failed_conversions = []  # Track conversion failures
 
         # Find all CONVERTPDF_*.md files
         markdown_files = list(maker_output_dir.rglob("CONVERTPDF_*.md"))
@@ -374,6 +441,9 @@ class PackagerAgent(BaseAgent):
 
         for md_file in markdown_files:
             try:
+                # Sanitize markdown file to remove malformed image syntax
+                self._sanitize_markdown_images(md_file, emit)
+
                 # Remove CONVERTPDF_ prefix from filename
                 pdf_name = md_file.name.replace("CONVERTPDF_", "").replace(".md", ".pdf")
                 pdf_path = md_file.parent / pdf_name
@@ -408,29 +478,71 @@ class PackagerAgent(BaseAgent):
                     env=env
                 )
 
-                if result.returncode == 0:
+                # Check if PDF was successfully created (even if Pandoc had warnings)
+                if pdf_path.exists() and pdf_path.stat().st_size > 0:
                     converted_pdfs.append(pdf_path)
                     self.logger.info(f"✓ Converted: {md_file.name} -> {pdf_name}")
                     emit({"event": "log", "step": self.step_name, "message": f"✓ Converted {pdf_name}"})
 
+                    # Log warnings if Pandoc exited with non-zero code
+                    if result.returncode != 0 and result.stderr:
+                        self.logger.warning(f"Pandoc warnings for {md_file.name}: {result.stderr[:500]}")
+                        # Only emit detailed warnings if they seem important
+                        if "error" in result.stderr.lower() or "failed" in result.stderr.lower():
+                            emit({"event": "log", "step": self.step_name, "message": f"⚠ Pandoc warnings for {pdf_name} (PDF created successfully)"})
+
                     # Optionally delete the markdown file after conversion
                     # md_file.unlink()
                 else:
+                    # PDF was NOT created - this is a real failure
+                    stderr_lower = result.stderr.lower() if result.stderr else ""
+
                     # Check if error is due to missing wkhtmltopdf
-                    stderr_lower = result.stderr.lower()
                     if "wkhtmltopdf" in stderr_lower or "pdf-engine" in stderr_lower:
-                        error_msg = f"Pandoc failed for {md_file.name}: wkhtmltopdf not found. Please download from https://wkhtmltopdf.org/downloads.html and place in backend/bin/"
+                        error_msg = "wkhtmltopdf not found. Please download from https://wkhtmltopdf.org/downloads.html and place in backend/bin/"
                     else:
-                        error_msg = f"Pandoc failed for {md_file.name}: {result.stderr}"
-                    self.logger.error(error_msg)
-                    emit({"event": "log", "step": self.step_name, "message": f"⚠ {error_msg}"})
+                        error_msg = result.stderr[:500] if result.stderr else "Unknown error - PDF not created"
+
+                    # Log for debugging
+                    self.logger.error(f"Pandoc failed for {md_file.name}: {error_msg}")
+                    emit({"event": "log", "step": self.step_name, "message": f"⚠ Failed to convert {md_file.name}"})
+
+                    # Track failure for later exception
+                    failed_conversions.append({
+                        "file": md_file.name,
+                        "error": error_msg
+                    })
 
             except subprocess.TimeoutExpired:
+                error_msg = "Conversion timed out after 60 seconds"
                 self.logger.error(f"Pandoc timeout for {md_file.name}")
                 emit({"event": "log", "step": self.step_name, "message": f"⚠ Timeout converting {md_file.name}"})
+
+                # Track timeout as failure
+                failed_conversions.append({
+                    "file": md_file.name,
+                    "error": error_msg
+                })
             except Exception as e:
+                error_msg = f"Unexpected error: {str(e)}"
                 self.logger.error(f"Failed to convert {md_file.name}: {e}")
                 emit({"event": "log", "step": self.step_name, "message": f"⚠ Failed to convert {md_file.name}"})
+
+                # Track exception as failure
+                failed_conversions.append({
+                    "file": md_file.name,
+                    "error": error_msg
+                })
+
+        # After processing all files, check for failures
+        if failed_conversions:
+            # Build detailed error message
+            error_msg = f"Failed to convert {len(failed_conversions)}/{len(markdown_files)} markdown file(s) to PDF:\n"
+            for failure in failed_conversions:
+                error_msg += f"  - {failure['file']}: {failure['error']}\n"
+
+            self.logger.error(error_msg)
+            raise ValueError(error_msg.strip())
 
         return converted_pdfs
 

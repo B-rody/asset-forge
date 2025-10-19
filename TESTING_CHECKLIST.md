@@ -31,20 +31,20 @@
 
 ## Testing Environment Setup
 
-- [ ] **Local Development Environment**
-  - [ ] `pnpm dev` runs successfully
-  - [ ] Backend sidecar connects properly
-  - [ ] Frontend loads without errors
-  - [ ] Console shows no duplicate error messages
+- [x] **Local Development Environment**
+  - [x] `pnpm dev` runs successfully
+  - [x] Backend sidecar connects properly
+  - [x] Frontend loads without errors
+  - [x] Console shows no duplicate error messages
 
-- [ ] **API Key Configuration**
-  - [ ] API key stored in system keyring
-  - [ ] API key retrieved correctly on app start
+- [x] **API Key Configuration**
+  - [x] API key stored in system keyring
+  - [x] API key retrieved correctly on app start
   - [ ] Invalid API key shows proper error message
 
 - [ ] **Output Directory**
-  - [ ] Output directory can be configured
-  - [ ] Output directory persists across restarts
+  - [x] Output directory can be configured
+  - [x] Output directory persists across restarts
   - [ ] Permissions verified (can write to directory)
 
 ---
@@ -56,20 +56,20 @@
 **Scenario**: Generate research without creating bundles
 
 **Steps**:
-- [ ] Run Research Only (unfocused mode)
-  - [ ] Start pipeline with "research_only" mode
-  - [ ] Verify progress updates appear
-  - [ ] Confirm ideas saved to database
-  - [ ] Check `ideas` table has new entries
-  - [ ] Verify no bundles created
-  - [ ] Confirm duplicate prevention works (run same research twice)
+- [x] Run Research Only (unfocused mode)
+  - [x] Start pipeline with "research_only" mode
+  - [x] Verify progress updates appear
+  - [x] Confirm ideas saved to database
+  - [x] Check `ideas` table has new entries
+  - [x] Verify no bundles created
+  - [x] Confirm duplicate prevention works (run same research twice)
 
-- [ ] Run Research Only (focused mode)
-  - [ ] Start pipeline with "research_only_focused" mode
-  - [ ] Provide keyword (e.g., "notion templates")
-  - [ ] Verify focused research on that keyword
-  - [ ] Check ideas relate to the keyword
-  - [ ] Confirm duplicate prevention for same keyword
+- [x] Run Research Only (focused mode)
+  - [x] Start pipeline with "research_only_focused" mode
+  - [x] Provide keyword (e.g., "notion templates")
+  - [x] Verify focused research on that keyword
+  - [x] Check ideas relate to the keyword
+  - [x] Confirm duplicate prevention for same keyword
 
 **Expected Database State**:
 ```sql
@@ -97,18 +97,18 @@ SELECT COUNT(*) FROM bundles; -- Should not increase
 **Scenario**: Complete autonomous flow from research to packaged bundle
 
 **Steps**:
-- [ ] Run One-Click Pipeline (unfocused)
-  - [ ] Start pipeline with "one_click" mode
-  - [ ] Watch all steps execute: Researcher → Planner → Maker → Packager
-  - [ ] Verify progress updates at each step
-  - [ ] Confirm bundle created in output directory
-  - [ ] Check final ZIP file exists and is valid
+- [x] Run One-Click Pipeline (unfocused)
+  - [x] Start pipeline with "one_click" mode
+  - [x] Watch all steps execute: Researcher → Planner → Maker → Packager
+  - [x] Verify progress updates at each step
+  - [x] Confirm bundle created in output directory
+  - [x] Check final ZIP file exists and is valid
 
-- [ ] Run One-Click Pipeline (focused)
-  - [ ] Start pipeline with "focused" mode
-  - [ ] Provide keyword (e.g., "productivity planner")
-  - [ ] Verify all steps complete with focused research
-  - [ ] Check bundle relates to keyword
+- [x] Run One-Click Pipeline (focused)
+  - [x] Start pipeline with "focused" mode
+  - [x] Provide keyword (e.g., "productivity planner")
+  - [x] Verify all steps complete with focused research
+  - [x] Check bundle relates to keyword
 
 **Expected Database State**:
 ```sql
@@ -138,12 +138,12 @@ SELECT * FROM activity_logs WHERE bundle_id = '<bundle_id>' ORDER BY started_at;
 - ✅ No duplicate errors displayed
 
 **Output Validation**:
-- [ ] Open bundle directory
-- [ ] Verify `researcher_output.json` exists
-- [ ] Verify `planner_output.json` exists
-- [ ] Verify `maker_output/` directory has files
-- [ ] Verify `packager_output/final_bundle.zip` exists
-- [ ] Extract ZIP and check contents are valid
+- [x] Open bundle directory
+- [x] Verify `researcher_output.json` exists
+- [x] Verify `planner_output.json` exists
+- [x] Verify `maker_output/` directory has files
+- [x] Verify `packager_output/final_bundle.zip` exists
+- [x] Extract ZIP and check contents are valid
 
 ---
 
@@ -159,11 +159,11 @@ SELECT * FROM activity_logs WHERE bundle_id = '<bundle_id>' ORDER BY started_at;
   ```sql
   SELECT * FROM ideas WHERE priority IN ('A', 'B') ORDER BY created_at DESC LIMIT 5;
   ```
-- [ ] Run Quick Build command
-  - [ ] Frontend sends "quick_build_from_existing" command
-  - [ ] Verify orchestrator selects best idea (Priority A > B, highest ROI)
-  - [ ] Watch Planner → Maker → Packager execute
-  - [ ] Confirm bundle created and archived
+- [x] Run Quick Build command
+  - [x] Frontend sends "quick_build_from_existing" command
+  - [x] Verify orchestrator selects best idea (Priority A > B, highest ROI)
+  - [x] Watch Planner → Maker → Packager execute
+  - [x] Confirm bundle created and archived
 
 **Expected Database State**:
 ```sql
@@ -194,11 +194,11 @@ SELECT * FROM used_ideas WHERE idea_id = '<selected_idea_id>';
 - Ideas exist in database
 
 **Steps**:
-- [ ] Browse available ideas in UI
-- [ ] Select specific idea manually
-- [ ] Run "build_full_from_idea" command with selected `idea_id`
-- [ ] Verify Planner → Maker → Packager execute for that idea
-- [ ] Confirm bundle matches selected idea
+- [x] Browse available ideas in UI
+- [x] Select specific idea manually
+- [x] Run "build_full_from_idea" command with selected `idea_id`
+- [x] Verify Planner → Maker → Packager execute for that idea
+- [x] Confirm bundle matches selected idea
 
 **Expected Database State**:
 ```sql
@@ -226,24 +226,24 @@ SELECT * FROM created_bundles WHERE idea_id = '<selected_idea_id>' ORDER BY comp
 - Bundle in "maker completed" state (for packager re-run)
 
 **Steps - Re-run Maker**:
-- [ ] Find bundle in "planner completed" state
+- [x] Find bundle in "planner completed" state
   ```sql
   SELECT * FROM bundles WHERE current_step = 'planner' AND status = 'completed';
   ```
-- [ ] Run "generate_assets_from_bundle" command with `bundle_id`
-- [ ] Verify Maker executes
-- [ ] Check maker_output directory updated
-- [ ] Confirm bundle status updated
+- [x] Run "generate_assets_from_bundle" command with `bundle_id`
+- [x] Verify Maker executes
+- [x] Check maker_output directory updated
+- [x] Confirm bundle status updated
 
 **Steps - Re-run Packager**:
-- [ ] Find bundle in "maker completed" state
+- [x] Find bundle in "maker completed" state
   ```sql
   SELECT * FROM bundles WHERE current_step = 'maker' AND status = 'completed';
   ```
-- [ ] Run "package_bundle" command with `bundle_id`
-- [ ] Verify Packager executes
-- [ ] Confirm bundle archived
-- [ ] Check ZIP file created
+- [x] Run "package_bundle" command with `bundle_id`
+- [x] Verify Packager executes
+- [x] Confirm bundle archived
+- [x] Check ZIP file created
 
 **Success Criteria**:
 - ✅ Individual steps re-run successfully

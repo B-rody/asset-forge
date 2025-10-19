@@ -280,6 +280,22 @@ Use this space to track thoughts and observations.
 - Maintain consistent spacing between sections
 - Keep content professional and well-organized
 
+**CRITICAL - Image References:**
+- **NEVER use image markdown syntax** `![alt](path)` unless you are creating actual image files
+- If describing visual layouts (e.g., Notion dashboards), use **text descriptions** instead of image placeholders
+- ✗ WRONG: `![Alt text: Notion dashboard with callouts]()`
+- ✗ WRONG: `![](Alt text: Notion dashboard with callouts)`
+- ✓ CORRECT: Use a text section instead:
+  ```markdown
+  **Visual Layout:**
+  The Notion dashboard includes four main callouts:
+  1. Enter targets
+  2. Add mini-meal
+  3. Favorite snacks
+  4. Review summary
+  ```
+- Only include `![alt](path)` if you're actually creating the image file in the container
+
 **Example Code for Creating Markdown File:**
 ```python
 # For PDF assets, create Markdown with CONVERTPDF_ prefix

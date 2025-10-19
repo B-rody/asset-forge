@@ -116,7 +116,7 @@ class IdeaQueries:
             return None
 
     def get_available_ideas(self, weeks_back: int = 8, priorities: List[str] = ["A", "B"]) -> List[Idea]:
-        """Get fresh unused ideas from recent research"""
+        """Get fresh unused ideas from recent research, excluding ideas that have been used"""
         try:
             conn = self.db.get_connection()
             cursor = conn.cursor()
@@ -124,10 +124,12 @@ class IdeaQueries:
             cutoff_date = (datetime.now() - timedelta(weeks=weeks_back)).isoformat()
             priority_placeholders = ','.join('?' for _ in priorities)
 
+            # Exclude ideas that exist in used_ideas table (defensive query)
             cursor.execute(f"""
                 SELECT * FROM ideas
                 WHERE created_at > ?
                 AND priority IN ({priority_placeholders})
+                AND idea_id NOT IN (SELECT idea_id FROM used_ideas)
                 ORDER BY priority ASC, roi_estimate DESC
             """, (cutoff_date, *priorities))
 
@@ -139,13 +141,15 @@ class IdeaQueries:
             return []
 
     def get_all(self, limit: int = 100) -> List[Idea]:
-        """Fetch all ideas (sorted by ROI)"""
+        """Fetch all ideas (sorted by ROI), excluding ideas that have been used"""
         try:
             conn = self.db.get_connection()
             cursor = conn.cursor()
 
+            # Exclude ideas that exist in used_ideas table (defensive query)
             cursor.execute("""
                 SELECT * FROM ideas
+                WHERE idea_id NOT IN (SELECT idea_id FROM used_ideas)
                 ORDER BY priority ASC, roi_estimate DESC
                 LIMIT ?
             """, (limit,))

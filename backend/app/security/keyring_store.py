@@ -91,6 +91,7 @@ def get_openai_client():
     """
     try:
         from openai import OpenAI
+        import httpx
     except ImportError:
         raise ImportError(
             "OpenAI package not installed. Run: pip install openai"
@@ -104,4 +105,24 @@ def get_openai_client():
         )
 
     logger.info("Creating OpenAI client with key from keyring")
-    return OpenAI(api_key=api_key)
+
+    # Configure extended timeout for long-running operations
+    # Researcher agent with web_search can take 10+ minutes
+    # Using httpx.Timeout for granular control:
+    # - connect: 10s (time to establish connection)
+    # - read: 15 minutes (time to receive response - important for streaming)
+    # - write: 30s (time to send request)
+    # - pool: 10s (time to acquire connection from pool)
+    timeout = httpx.Timeout(
+        connect=10.0,
+        read=900.0,  # 15 minutes for long-running researcher operations
+        write=30.0,
+        pool=10.0
+    )
+
+    # max_retries=3 ensures transient network errors are retried
+    return OpenAI(
+        api_key=api_key,
+        timeout=timeout,
+        max_retries=3  # Retry transient connection errors
+    )

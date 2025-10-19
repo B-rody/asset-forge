@@ -42,6 +42,9 @@ class ResearcherAgent(BaseAgent):
         """
         emit({"event": "log", "step": self.step_name, "message": "Starting research..."})
 
+        # Track execution time for error reporting
+        start_time = datetime.now()
+
         try:
             # Build enhanced instructions with off-limits ideas
             enhanced_instructions = self._build_enhanced_instructions(emit)
@@ -97,9 +100,26 @@ class ResearcherAgent(BaseAgent):
             return result
 
         except Exception as e:
-            self.logger.error(f"Execution failed: {e}")
-            emit({"event": "error", "step": self.step_name, "message": str(e)})
-            raise
+            error_message = str(e)
+
+            # Provide more helpful error messages for common failures
+            if "peer closed connection" in error_message.lower() or "incomplete chunked read" in error_message.lower():
+                elapsed = int((datetime.now() - start_time).total_seconds())
+                error_message = (
+                    "OpenAI API connection was interrupted during streaming. "
+                    "This can happen with long-running web searches. "
+                    f"The request ran for {elapsed}s before failing. "
+                    "Please try again - the system will automatically retry on transient errors."
+                )
+            elif "timeout" in error_message.lower():
+                error_message = (
+                    f"OpenAI API request timed out. The researcher agent with web_search can take 10+ minutes. "
+                    f"Current timeout is set to 15 minutes. Original error: {error_message}"
+                )
+
+            self.logger.error(f"Execution failed: {error_message}")
+            emit({"event": "error", "step": self.step_name, "message": error_message})
+            raise ValueError(error_message) from e
 
     def _build_enhanced_instructions(self, emit: Callable[[Dict[str, Any]], None]) -> str:
         """
@@ -195,8 +215,12 @@ class ResearcherAgent(BaseAgent):
         try:
             from app.database.models import Idea, ResearchSession
 
-            # Generate session ID from timestamp
-            session_id = f"session-{datetime.now().strftime('%Y-%m-%d-%H%M%S')}"
+            # Generate session ID and timestamp for unique idea IDs
+            timestamp = datetime.now()
+            session_id = f"session-{timestamp.strftime('%Y-%m-%d-%H%M%S')}"
+            # Use compact format for idea IDs: idea-YYYYMMDD-HHMMSS-XXX
+            idea_id_prefix = f"idea-{timestamp.strftime('%Y%m%d-%H%M%S')}"
+
             ideas = result.get("ideas", [])
 
             self.logger.info(f"Starting database save: {len(ideas)} ideas to session {session_id}")
@@ -217,7 +241,9 @@ class ResearcherAgent(BaseAgent):
 
             for idx, idea_data in enumerate(ideas, 1):
                 try:
-                    idea_id = idea_data.get("id", f"unknown-{idx}")
+                    # Generate unique ID in backend instead of trusting AI
+                    # Format: idea-YYYYMMDD-HHMMSS-XXX (e.g., idea-20251017-143052-001)
+                    idea_id = f"{idea_id_prefix}-{idx:03d}"
                     idea_title = idea_data.get("title", "Untitled")
 
                     self.logger.debug(f"Saving idea {idx}/{len(ideas)}: {idea_id} - {idea_title[:50]}")
