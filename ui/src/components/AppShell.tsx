@@ -192,8 +192,9 @@ export function AppShell() {
           });
         } else {
           setResult({
-            bundle_id: "failed",
-            output_path: "N/A",
+            bundle_id: event.result?.bundle_id || "unknown",
+            bundle_title: event.result?.bundle_title,
+            message: event.error || "An error occurred during execution",
             status: "error",
             runtime,
             mode: runningModeRef.current,
@@ -309,6 +310,14 @@ export function AppShell() {
   const handleNavigateToIdeasLibrary = () => {
     // Navigate to Library tab with Ideas sub-tab active
     setLibraryDefaultTab("ideas");
+    setActiveTab("library");
+  };
+
+  const handleNavigateToLibrary = (subtab?: LibraryTab) => {
+    // Navigate to Library tab with optional sub-tab selection
+    if (subtab) {
+      setLibraryDefaultTab(subtab);
+    }
     setActiveTab("library");
   };
 
@@ -428,7 +437,7 @@ export function AppShell() {
                     result={result}
                     onGenerateAssets={handleGenerateAssets}
                     onPackageBundle={handlePackageBundle}
-                    onNavigateToLibrary={() => setActiveTab("library")}
+                    onNavigateToLibrary={handleNavigateToLibrary}
                   />
                 </div>
               </>

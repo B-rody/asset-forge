@@ -218,6 +218,7 @@ class PackagerAgent(BaseAgent):
                 "store_description": store_description,
                 "metadata_file": str(metadata_path),
                 "converted_pdfs": [str(p) for p in converted_pdfs],
+                "total_assets": len(assets_metadata),
                 "final_output_path": str(final_output_path)
             }
 

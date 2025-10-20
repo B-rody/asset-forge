@@ -5,6 +5,7 @@ Coordinates the execution of all pipeline agents using OpenAI
 
 import asyncio
 import json
+import os
 from datetime import datetime
 from functools import partial
 from typing import Dict, Any, Callable
@@ -22,6 +23,32 @@ from app.pipeline.agents.asset_agents.asset_maker import MakerAgent
 from app.pipeline.agents.asset_agents.asset_packager import PackagerAgent
 
 logger = setup_logger(__name__)
+
+# ============================================================================
+# DEBUG MODE: Force API Failures for Testing
+# ============================================================================
+# Set environment variable DEBUG_FORCE_FAILURE to force failures at specific steps.
+# This is useful for testing error handling, database state transitions, and retry logic.
+#
+# Usage:
+#   Windows CMD:
+#     set DEBUG_FORCE_FAILURE=planner
+#     pnpm dev
+#
+#   Windows PowerShell:
+#     $env:DEBUG_FORCE_FAILURE="planner"
+#     pnpm dev
+#
+#   Normal mode (no debug failures):
+#     pnpm dev
+#
+# Valid values: "researcher", "planner", "maker", "packager", or None (disabled)
+# ============================================================================
+_DEBUG_FORCE_FAILURE_AT_STEP = os.getenv("DEBUG_FORCE_FAILURE", None)
+
+if _DEBUG_FORCE_FAILURE_AT_STEP:
+    logger.warning(f"⚠️  DEBUG MODE ACTIVE: Will force failure at step '{_DEBUG_FORCE_FAILURE_AT_STEP}'")
+    logger.warning(f"⚠️  This is for testing only. Unset DEBUG_FORCE_FAILURE to disable.")
 
 
 class PipelineOrchestrator:
@@ -85,6 +112,11 @@ class PipelineOrchestrator:
             # Extract params for researcher
             focus = mode in ["focused", "research_only_focused"]
             niches = params.get("keyword", "") if focus else ""
+
+            # DEBUG: Force failure if configured
+            if _DEBUG_FORCE_FAILURE_AT_STEP == "researcher":
+                logger.warning("⚠️  DEBUG: Forcing failure at Researcher step")
+                raise Exception("DEBUG MODE: Forced failure at Researcher step for testing error handling")
 
             # Run researcher in thread pool (sync agent in async context)
             loop = asyncio.get_event_loop()
@@ -160,6 +192,11 @@ class PipelineOrchestrator:
                 metadata_json=json.dumps({"mode": mode})
             ))
 
+            # DEBUG: Force failure if configured
+            if _DEBUG_FORCE_FAILURE_AT_STEP == "planner":
+                logger.warning("⚠️  DEBUG: Forcing failure at Planner step")
+                raise Exception("DEBUG MODE: Forced failure at Planner step for testing error handling")
+
             planner_result = await loop.run_in_executor(
                 None,
                 partial(self.planner.execute, idea=idea_id, emit=emit)
@@ -190,6 +227,11 @@ class PipelineOrchestrator:
                 metadata_json=json.dumps({"mode": mode})
             ))
 
+            # DEBUG: Force failure if configured
+            if _DEBUG_FORCE_FAILURE_AT_STEP == "maker":
+                logger.warning("⚠️  DEBUG: Forcing failure at Maker step")
+                raise Exception("DEBUG MODE: Forced failure at Maker step for testing error handling")
+
             maker_result = await loop.run_in_executor(
                 None,
                 partial(self.maker.execute, bundle_id=bundle_id, emit=emit)
@@ -216,6 +258,11 @@ class PipelineOrchestrator:
                 error_message=None,
                 metadata_json=json.dumps({"mode": mode})
             ))
+
+            # DEBUG: Force failure if configured
+            if _DEBUG_FORCE_FAILURE_AT_STEP == "packager":
+                logger.warning("⚠️  DEBUG: Forcing failure at Packager step")
+                raise Exception("DEBUG MODE: Forced failure at Packager step for testing error handling")
 
             packager_result = await loop.run_in_executor(
                 None,
@@ -312,11 +359,9 @@ class PipelineOrchestrator:
                 if bundle_record:
                     self.bundle_queries.update_step(bundle_id_to_fail, bundle_record.current_step, "failed", str(e))
 
-            # Don't re-log the error here since agents already log it with their step name
-            # Just emit error event and done status
-
-            # Emit error event with step name for log display
-            emit({"event": "error", "step": failed_step, "message": str(e)})
+            # Don't emit separate error event - the done event already contains the error
+            # This prevents duplicate error messages in the UI
+            # (Agents may emit their own error events before raising, but orchestrator just handles cleanup)
 
             # Emit done event with failure status (don't re-raise)
             emit({
@@ -360,6 +405,11 @@ class PipelineOrchestrator:
                 error_message=None,
                 metadata_json=None
             ))
+
+            # DEBUG: Force failure if configured
+            if _DEBUG_FORCE_FAILURE_AT_STEP == "planner":
+                logger.warning("⚠️  DEBUG: Forcing failure at Planner step")
+                raise Exception("DEBUG MODE: Forced failure at Planner step for testing error handling")
 
             # Run planner in thread pool (sync agent in async context)
             loop = asyncio.get_event_loop()
@@ -405,11 +455,9 @@ class PipelineOrchestrator:
                 if bundle_record:
                     self.bundle_queries.update_step(bundle_id_to_fail, bundle_record.current_step, "failed", str(e))
 
-            # Don't re-log the error here since agents already log it with their step name
-            # Just emit error event and done status
-
-            # Emit error event with step name for log display
-            emit({"event": "error", "step": "Planner", "message": str(e)})
+            # Don't emit separate error event - the done event already contains the error
+            # This prevents duplicate error messages in the UI
+            # (Agents may emit their own error events before raising, but orchestrator just handles cleanup)
 
             # Emit done event with failure status (don't re-raise)
             emit({
@@ -461,6 +509,11 @@ class PipelineOrchestrator:
                 error_message=None,
                 metadata_json=None
             ))
+
+            # DEBUG: Force failure if configured
+            if _DEBUG_FORCE_FAILURE_AT_STEP == "maker":
+                logger.warning("⚠️  DEBUG: Forcing failure at Maker step")
+                raise Exception("DEBUG MODE: Forced failure at Maker step for testing error handling")
 
             # Run maker in thread pool (sync agent in async context)
             loop = asyncio.get_event_loop()
@@ -517,11 +570,9 @@ class PipelineOrchestrator:
             if bundle_record:
                 self.bundle_queries.update_step(bundle_id, bundle_record.current_step, "failed", str(e))
 
-            # Don't re-log the error here since agents already log it with their step name
-            # Just emit error event and done status
-
-            # Emit error event with step name for log display
-            emit({"event": "error", "step": "Maker", "message": str(e)})
+            # Don't emit separate error event - the done event already contains the error
+            # This prevents duplicate error messages in the UI
+            # (Agents may emit their own error events before raising, but orchestrator just handles cleanup)
 
             # Emit done event with failure status (don't re-raise)
             emit({
@@ -549,13 +600,13 @@ class PipelineOrchestrator:
         emit({"event": "log", "step": "Orchestrator", "message": f"Packaging bundle {bundle_id}..."})
 
         try:
-            # Validate bundle exists and has completed maker step
+            # Validate bundle exists and is at packager step
             bundle_record = self.bundle_queries.get_by_id(bundle_id)
             if not bundle_record:
                 raise ValueError(f"Bundle not found: {bundle_id}")
 
-            if bundle_record.current_step != "maker" or bundle_record.status != "completed":
-                raise ValueError(f"Bundle {bundle_id} must complete maker step first (current: {bundle_record.current_step}/{bundle_record.status})")
+            if bundle_record.current_step != "packager":
+                raise ValueError(f"Bundle {bundle_id} must be at packager step (current: {bundle_record.current_step}/{bundle_record.status})")
 
             if not bundle_record.planner_output:
                 raise ValueError(f"Bundle {bundle_id} has no planner output")
@@ -583,6 +634,11 @@ class PipelineOrchestrator:
                 error_message=None,
                 metadata_json=None
             ))
+
+            # DEBUG: Force failure if configured
+            if _DEBUG_FORCE_FAILURE_AT_STEP == "packager":
+                logger.warning("⚠️  DEBUG: Forcing failure at Packager step")
+                raise Exception("DEBUG MODE: Forced failure at Packager step for testing error handling")
 
             # Run packager in thread pool (sync agent in async context)
             loop = asyncio.get_event_loop()
@@ -664,11 +720,9 @@ class PipelineOrchestrator:
             if bundle_record:
                 self.bundle_queries.update_step(bundle_id, bundle_record.current_step, "failed", str(e))
 
-            # Don't re-log the error here since agents already log it with their step name
-            # Just emit error event and done status
-
-            # Emit error event with step name for log display
-            emit({"event": "error", "step": "Packager", "message": str(e)})
+            # Don't emit separate error event - the done event already contains the error
+            # This prevents duplicate error messages in the UI
+            # (Agents may emit their own error events before raising, but orchestrator just handles cleanup)
 
             # Emit done event with failure status (don't re-raise)
             emit({
@@ -730,6 +784,11 @@ class PipelineOrchestrator:
                 metadata_json=json.dumps({"mode": "quick_build"})
             ))
 
+            # DEBUG: Force failure if configured
+            if _DEBUG_FORCE_FAILURE_AT_STEP == "planner":
+                logger.warning("⚠️  DEBUG: Forcing failure at Planner step")
+                raise Exception("DEBUG MODE: Forced failure at Planner step for testing error handling")
+
             loop = asyncio.get_event_loop()
             planner_result = await loop.run_in_executor(
                 None,
@@ -761,6 +820,11 @@ class PipelineOrchestrator:
                 metadata_json=json.dumps({"mode": "quick_build"})
             ))
 
+            # DEBUG: Force failure if configured
+            if _DEBUG_FORCE_FAILURE_AT_STEP == "maker":
+                logger.warning("⚠️  DEBUG: Forcing failure at Maker step")
+                raise Exception("DEBUG MODE: Forced failure at Maker step for testing error handling")
+
             maker_result = await loop.run_in_executor(
                 None,
                 partial(self.maker.execute, bundle_id=bundle_id, emit=emit)
@@ -787,6 +851,11 @@ class PipelineOrchestrator:
                 error_message=None,
                 metadata_json=json.dumps({"mode": "quick_build"})
             ))
+
+            # DEBUG: Force failure if configured
+            if _DEBUG_FORCE_FAILURE_AT_STEP == "packager":
+                logger.warning("⚠️  DEBUG: Forcing failure at Packager step")
+                raise Exception("DEBUG MODE: Forced failure at Packager step for testing error handling")
 
             packager_result = await loop.run_in_executor(
                 None,
@@ -875,11 +944,9 @@ class PipelineOrchestrator:
                 if bundle_record:
                     self.bundle_queries.update_step(bundle_id_to_fail, bundle_record.current_step, "failed", str(e))
 
-            # Don't re-log the error here since agents already log it with their step name
-            # Just emit error event and done status
-
-            # Emit error event with step name
-            emit({"event": "error", "step": failed_step, "message": str(e)})
+            # Don't emit separate error event - the done event already contains the error
+            # This prevents duplicate error messages in the UI
+            # (Agents may emit their own error events before raising, but orchestrator just handles cleanup)
 
             # Emit done event with failure status
             emit({
@@ -933,6 +1000,11 @@ class PipelineOrchestrator:
                 metadata_json=json.dumps({"mode": "manual_full_build"})
             ))
 
+            # DEBUG: Force failure if configured
+            if _DEBUG_FORCE_FAILURE_AT_STEP == "planner":
+                logger.warning("⚠️  DEBUG: Forcing failure at Planner step")
+                raise Exception("DEBUG MODE: Forced failure at Planner step for testing error handling")
+
             loop = asyncio.get_event_loop()
             planner_result = await loop.run_in_executor(
                 None,
@@ -964,6 +1036,11 @@ class PipelineOrchestrator:
                 metadata_json=json.dumps({"mode": "manual_full_build"})
             ))
 
+            # DEBUG: Force failure if configured
+            if _DEBUG_FORCE_FAILURE_AT_STEP == "maker":
+                logger.warning("⚠️  DEBUG: Forcing failure at Maker step")
+                raise Exception("DEBUG MODE: Forced failure at Maker step for testing error handling")
+
             maker_result = await loop.run_in_executor(
                 None,
                 partial(self.maker.execute, bundle_id=bundle_id, emit=emit)
@@ -990,6 +1067,11 @@ class PipelineOrchestrator:
                 error_message=None,
                 metadata_json=json.dumps({"mode": "manual_full_build"})
             ))
+
+            # DEBUG: Force failure if configured
+            if _DEBUG_FORCE_FAILURE_AT_STEP == "packager":
+                logger.warning("⚠️  DEBUG: Forcing failure at Packager step")
+                raise Exception("DEBUG MODE: Forced failure at Packager step for testing error handling")
 
             packager_result = await loop.run_in_executor(
                 None,
@@ -1078,11 +1160,9 @@ class PipelineOrchestrator:
                 if bundle_record:
                     self.bundle_queries.update_step(bundle_id_to_fail, bundle_record.current_step, "failed", str(e))
 
-            # Don't re-log the error here since agents already log it with their step name
-            # Just emit error event and done status
-
-            # Emit error event with step name
-            emit({"event": "error", "step": failed_step, "message": str(e)})
+            # Don't emit separate error event - the done event already contains the error
+            # This prevents duplicate error messages in the UI
+            # (Agents may emit their own error events before raising, but orchestrator just handles cleanup)
 
             # Emit done event with failure status
             emit({

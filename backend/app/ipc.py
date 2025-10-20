@@ -503,17 +503,52 @@ class IPCServer:
                 params = command.get("params", {})
                 limit = params.get("limit", 100)
 
-                from app.database.queries import CreatedBundleQueries
+                from app.database.queries import CreatedBundleQueries, ActivityLogQueries
+                from datetime import datetime
                 created_bundle_queries = CreatedBundleQueries(self.orchestrator.db_manager)
+                activity_log_queries = ActivityLogQueries(self.orchestrator.db_manager)
                 bundles = created_bundle_queries.get_all(limit=limit)
                 logger.info(f"Retrieved {len(bundles)} completed bundles from database")
 
+                # Enrich bundles with total duration from activity_log
+                enriched_bundles = []
+                for bundle in bundles:
+                    bundle_dict = bundle.model_dump()
+
+                    # Query all activity logs for this bundle
+                    try:
+                        activities = activity_log_queries.get_by_bundle(bundle.bundle_id)
+
+                        if activities:
+                            # Find earliest started_at and latest completed_at
+                            start_times = [datetime.fromisoformat(a.started_at) for a in activities if a.started_at]
+                            end_times = [datetime.fromisoformat(a.completed_at) for a in activities if a.completed_at]
+
+                            if start_times and end_times:
+                                earliest_start = min(start_times)
+                                latest_end = max(end_times)
+                                total_duration_seconds = (latest_end - earliest_start).total_seconds()
+                                bundle_dict['total_duration_minutes'] = int(total_duration_seconds / 60)
+                            else:
+                                bundle_dict['total_duration_minutes'] = 0
+                        else:
+                            # Fallback: use bundle's created_at to completed_at
+                            start_time = datetime.fromisoformat(bundle.created_at)
+                            end_time = datetime.fromisoformat(bundle.completed_at)
+                            duration_seconds = (end_time - start_time).total_seconds()
+                            bundle_dict['total_duration_minutes'] = int(duration_seconds / 60)
+                    except Exception as duration_error:
+                        logger.warning(f"Could not calculate duration for bundle {bundle.bundle_id}: {duration_error}")
+                        bundle_dict['total_duration_minutes'] = 0
+
+                    enriched_bundles.append(bundle_dict)
+
                 self.emit_event({
                     "event": "completed_bundles_list",
-                    "bundles": [bundle.model_dump() for bundle in bundles],
-                    "total": len(bundles)
+                    "bundles": enriched_bundles,
+                    "total": len(enriched_bundles)
                 })
-                logger.info(f"Emitted completed_bundles_list event with {len(bundles)} bundles")
+                logger.info(f"Emitted completed_bundles_list event with {len(enriched_bundles)} bundles")
 
             except Exception as e:
                 logger.error(f"Failed to get completed bundles: {e}", exc_info=True)

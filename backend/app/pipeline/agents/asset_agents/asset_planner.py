@@ -138,6 +138,9 @@ class PlannerAgent(BaseAgent):
         # Parse the full idea JSON
         try:
             idea_data = json.loads(idea_record.idea_json)
+            # IMPORTANT: Add idea_id to parsed data (it's stored in DB row, not in JSON blob)
+            # This is needed for _save_result() to properly link the bundle to the idea
+            idea_data["idea_id"] = idea_record.idea_id
             self.logger.info(f"Loaded idea data for: {idea_data.get('title', 'Unknown')}")
             return idea_data
         except json.JSONDecodeError as e:

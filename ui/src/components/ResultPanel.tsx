@@ -1,6 +1,7 @@
 import { CheckCircle2, XCircle, FolderOpen, Clock, FileText, Sparkles, Package, Lightbulb } from "lucide-react";
 import { open as openPath } from "@tauri-apps/api/shell";
 import { cn } from "@/lib/utils";
+import type { LibraryTab } from "./LibraryPanel";
 
 interface Result {
   bundle_id: string;
@@ -21,7 +22,7 @@ interface ResultPanelProps {
   result: Result | null;
   onGenerateAssets?: (bundleId: string) => void;
   onPackageBundle?: (bundleId: string) => void;
-  onNavigateToLibrary?: () => void;
+  onNavigateToLibrary?: (subtab?: LibraryTab) => void;
 }
 
 export function ResultPanel({ result, onGenerateAssets, onPackageBundle, onNavigateToLibrary }: ResultPanelProps) {
@@ -223,6 +224,86 @@ export function ResultPanel({ result, onGenerateAssets, onPackageBundle, onNavig
                 Open in Explorer
               </button>
             )}
+          </div>
+        )}
+
+        {/* Error Actions - Help user recover */}
+        {result.status === "error" && (
+          <div className="space-y-3 mt-4 p-4 bg-destructive/5 border border-destructive/20 rounded-md">
+            <p className="text-sm font-medium text-destructive">
+              {result.mode === "plan" && "Bundle planning failed"}
+              {result.mode === "maker" && "Asset generation failed"}
+              {result.mode === "packager" && "Bundle packaging failed"}
+              {!result.mode && "Pipeline failed"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {result.mode === "maker" && "The bundle plan is saved. You can retry generating assets from the Ready to Make tab."}
+              {result.mode === "packager" && "The assets are saved. You can retry packaging from the Ready to Package tab."}
+              {result.mode === "plan" && "You can view the original idea in the Library and try again."}
+            </p>
+
+            <div className="space-y-2">
+              {/* Retry Button - Only for maker and packager modes with bundle_id */}
+              {result.mode === "maker" && onGenerateAssets && result.bundle_id && result.bundle_id !== "unknown" && (
+                <button
+                  onClick={() => onGenerateAssets(result.bundle_id)}
+                  className={cn(
+                    "w-full flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium",
+                    "bg-blue-600 text-white shadow hover:bg-blue-700",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+                    "transition-colors"
+                  )}
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Retry Asset Generation
+                </button>
+              )}
+
+              {result.mode === "packager" && onPackageBundle && result.bundle_id && result.bundle_id !== "unknown" && (
+                <button
+                  onClick={() => onPackageBundle(result.bundle_id)}
+                  className={cn(
+                    "w-full flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium",
+                    "bg-orange-600 text-white shadow hover:bg-orange-700",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500",
+                    "transition-colors"
+                  )}
+                >
+                  <Package className="h-4 w-4" />
+                  Retry Packaging
+                </button>
+              )}
+
+              {/* View in Library - Always available */}
+              {onNavigateToLibrary && (
+                <button
+                  onClick={() => {
+                    // Navigate to the appropriate library subtab based on which step failed
+                    if (result.mode === "plan") {
+                      onNavigateToLibrary("ideas");
+                    } else if (result.mode === "maker") {
+                      onNavigateToLibrary("ready");
+                    } else if (result.mode === "packager") {
+                      onNavigateToLibrary("generated");
+                    } else {
+                      onNavigateToLibrary();
+                    }
+                  }}
+                  className={cn(
+                    "w-full flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium",
+                    "border-2 border-border hover:bg-accent",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "transition-colors"
+                  )}
+                >
+                  <Package className="h-4 w-4" />
+                  {result.mode === "plan" && "View Ideas in Library"}
+                  {result.mode === "maker" && "View in Ready to Make"}
+                  {result.mode === "packager" && "View in Ready to Package"}
+                  {!result.mode && "Go to Library"}
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>

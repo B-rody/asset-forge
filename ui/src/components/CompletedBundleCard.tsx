@@ -30,10 +30,8 @@ export function CompletedBundleCard({ bundle, onOpenFolder, onDelete }: Complete
     }
   };
 
-  // Calculate duration
-  const startTime = new Date(bundle.created_at).getTime();
-  const endTime = new Date(bundle.completed_at).getTime();
-  const durationMinutes = Math.round((endTime - startTime) / 1000 / 60);
+  // Use duration from backend (calculated from activity_log)
+  const durationMinutes = (bundle as any).total_duration_minutes || 0;
 
   // Format completed date
   const completedDate = new Date(bundle.completed_at).toLocaleDateString('en-US', {
@@ -44,11 +42,11 @@ export function CompletedBundleCard({ bundle, onOpenFolder, onDelete }: Complete
     minute: '2-digit'
   });
 
-  // Parse asset count from maker output
+  // Parse asset count from packager output
   let assetCount = 0;
   try {
-    const makerData = JSON.parse(bundle.maker_output);
-    assetCount = makerData.assets?.length || 0;
+    const packagerData = JSON.parse(bundle.packager_output);
+    assetCount = packagerData.total_assets || 0;
   } catch (e) {
     // Ignore parsing errors
   }

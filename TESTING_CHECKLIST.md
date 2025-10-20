@@ -42,10 +42,10 @@
   - [x] API key retrieved correctly on app start
   - [ ] Invalid API key shows proper error message
 
-- [ ] **Output Directory**
+- [x] **Output Directory**
   - [x] Output directory can be configured
   - [x] Output directory persists across restarts
-  - [ ] Permissions verified (can write to directory)
+  - [x] Permissions verified (can write to directory)
 
 ---
 
@@ -253,6 +253,26 @@ SELECT * FROM created_bundles WHERE idea_id = '<selected_idea_id>' ORDER BY comp
 
 ---
 
+# IMPORTANT GUIDANCE
+For PowerShell (if you prefer):
+
+  Same concept - temporary session variable:
+  $env:DEBUG_FORCE_FAILURE="planner"
+  pnpm dev
+
+  Or one-liner:
+  $env:DEBUG_FORCE_FAILURE="planner"; pnpm dev
+
+  ---
+  Important: NOT a System Environment Variable
+
+  ❌ You do NOT need to:
+  - Go to Windows Settings → System → Environment Variables
+  - Create a permanent system variable
+  - Restart your computer
+
+  ✅ It's just a temporary variable for that terminal session!
+
 ## TIER 2: Error Recovery & Edge Cases
 
 ### 2.1 API Failure Mid-Pipeline
@@ -314,10 +334,10 @@ SELECT * FROM activity_logs WHERE bundle_id = '<failed_bundle_id>' ORDER BY star
 **Scenario**: Prevent duplicate research for same parameters
 
 **Steps**:
-- [ ] Run research with keyword "notion templates" (focused mode)
-- [ ] Immediately run research again with same keyword
-- [ ] Verify duplicate detected
-- [ ] Confirm no duplicate ideas created
+- [x] Run research with keyword "notion templates" (focused mode)
+- [x] Immediately run research again with same keyword
+- [x] Verify duplicate detected
+- [x] Confirm no duplicate ideas created
 
 **Expected Behavior**:
 - Error message about duplicate research OR
@@ -335,10 +355,10 @@ SELECT * FROM activity_logs WHERE bundle_id = '<failed_bundle_id>' ORDER BY star
 **Scenario**: Multiple pipelines cannot run simultaneously
 
 **Steps**:
-- [ ] Start one-click pipeline
-- [ ] While running, try to start another pipeline
-- [ ] Verify second pipeline is blocked or queued
-- [ ] Confirm first pipeline completes successfully
+- [x] Start one-click pipeline
+- [x] While running, try to start another pipeline
+- [x] Verify second pipeline is blocked or queued
+- [x] Confirm first pipeline completes successfully
 
 **Success Criteria**:
 - ✅ Only one pipeline runs at a time
@@ -352,9 +372,9 @@ SELECT * FROM activity_logs WHERE bundle_id = '<failed_bundle_id>' ORDER BY star
 **Scenario**: Researcher generates no ideas (edge case)
 
 **Steps**:
-- [ ] Use very specific/narrow keyword that yields no results
-- [ ] Run focused research
-- [ ] Verify graceful error handling
+- [x] Use very specific/narrow keyword that yields no results
+- [x] Run focused research
+- [x] Verify graceful error handling
 
 **Success Criteria**:
 - ✅ Clear error message "No ideas generated"

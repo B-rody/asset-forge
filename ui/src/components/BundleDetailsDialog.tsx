@@ -81,11 +81,11 @@ export function BundleDetailsDialog({ bundle, open, onOpenChange, onGenerateAsse
   const statusColor = displayStatus.color;
   const statusIcon = displayStatus.icon;
 
-  // Can generate assets if planner completed
-  const canGenerateAssets = bundle.status === 'completed' && bundle.current_step === 'planner';
+  // Can generate assets if bundle is at maker step (pending or failed - both need action)
+  const canGenerateAssets = bundle.current_step === 'maker';
 
-  // Can package bundle if maker completed
-  const canPackage = bundle.status === 'completed' && bundle.current_step === 'maker';
+  // Can package bundle if bundle is at packager step (pending or failed - both need action)
+  const canPackage = bundle.current_step === 'packager';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => onOpenChange(false)}>
