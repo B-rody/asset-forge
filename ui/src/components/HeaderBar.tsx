@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
-import { Moon, Sun, Key } from "lucide-react";
+import { Moon, Sun, Key, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SettingsDialog } from "./SettingsDialog";
+import { HelpDialog } from "./HelpDialog";
 import { ipcClient } from "@/lib/ipc";
 
 export function HeaderBar() {
   const [isDark, setIsDark] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
 
   // Set dark mode on initial load
@@ -86,6 +88,20 @@ export function HeaderBar() {
 
             <button
               type="button"
+              onClick={() => setShowHelp(true)}
+              className={cn(
+                "inline-flex items-center justify-center rounded-md text-sm font-medium",
+                "h-9 w-9 hover:bg-accent hover:text-accent-foreground",
+                "transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              )}
+              aria-label="Help"
+              title="Help & Documentation"
+            >
+              <HelpCircle className="h-5 w-5" />
+            </button>
+
+            <button
+              type="button"
               onClick={() => setShowSettings(true)}
               className={cn(
                 "relative inline-flex items-center justify-center rounded-md text-sm font-medium",
@@ -119,6 +135,7 @@ export function HeaderBar() {
       </header>
 
       <SettingsDialog open={showSettings} onOpenChange={handleSettingsChange} />
+      <HelpDialog open={showHelp} onOpenChange={setShowHelp} />
     </>
   );
 }

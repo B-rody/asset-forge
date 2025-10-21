@@ -128,7 +128,7 @@ export function ResultPanel({ result, onGenerateAssets, onPackageBundle, onNavig
             {/* Research Mode: View Ideas */}
             {result.mode === "research" && onNavigateToLibrary && (
               <button
-                onClick={onNavigateToLibrary}
+                onClick={() => onNavigateToLibrary("ideas")}
                 className={cn(
                   "w-full flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium",
                   "bg-blue-600 text-white shadow hover:bg-blue-700",
@@ -146,7 +146,7 @@ export function ResultPanel({ result, onGenerateAssets, onPackageBundle, onNavig
               <div className="space-y-2">
                 {onNavigateToLibrary && (
                   <button
-                    onClick={onNavigateToLibrary}
+                    onClick={() => onNavigateToLibrary("ready")}
                     className={cn(
                       "w-full flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium",
                       "border-2 border-purple-600 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/30",

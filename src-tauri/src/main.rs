@@ -127,35 +127,79 @@ async fn send_to_backend(
 }
 
 fn spawn_python_backend(window: Window) -> Result<PythonBackend, String> {
-    // Get absolute path to backend directory
-    // Tauri runs from src-tauri, so backend is ../backend
-    let backend_dir = std::env::current_dir()
-        .map_err(|e| format!("Failed to get current dir: {}", e))?
-        .parent()
-        .ok_or("Failed to get parent directory")?
-        .join("backend");
+    #[cfg(debug_assertions)]
+    {
+        // DEV MODE: Run Python directly from source
+        let backend_dir = std::env::current_dir()
+            .map_err(|e| format!("Failed to get current dir: {}", e))?
+            .parent()
+            .ok_or("Failed to get parent directory")?
+            .join("backend");
 
-    println!("Spawning Python backend from: {:?}", backend_dir);
+        println!("DEV MODE: Spawning Python backend from: {:?}", backend_dir);
 
-    let mut command = Command::new("python");
-    command
-        .args(&["-m", "app.main"])
-        .current_dir(&backend_dir)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit()); // Show Python errors in console
+        let mut command = Command::new("python");
+        command
+            .args(&["-m", "app.main"])
+            .current_dir(&backend_dir)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit());
 
-    let mut child = command.spawn()
-        .map_err(|e| format!("Failed to spawn Python backend: {}", e))?;
+        let mut child = command.spawn()
+            .map_err(|e| format!("Failed to spawn Python backend: {}", e))?;
 
-    let stdin = child.stdin.take()
-        .ok_or("Failed to capture Python stdin")?;
+        let stdin = child.stdin.take()
+            .ok_or("Failed to capture Python stdin")?;
 
-    let stdout = child.stdout.take()
-        .ok_or("Failed to capture Python stdout")?;
+        let stdout = child.stdout.take()
+            .ok_or("Failed to capture Python stdout")?;
 
-    // Spawn background task to read from Python stdout
-    let window_clone = window.clone();
+        spawn_output_reader(window, stdout);
+
+        return Ok(PythonBackend {
+            stdin: Arc::new(Mutex::new(Some(stdin))),
+            _process: Arc::new(Mutex::new(Some(child))),
+        });
+    }
+
+    #[cfg(not(debug_assertions))]
+    {
+        // PRODUCTION MODE: Run compiled backend from resources
+        let app_handle = window.app_handle();
+        let resource_path = app_handle
+            .path_resolver()
+            .resolve_resource("bin/assetforge_backend.exe")
+            .ok_or("Failed to resolve backend binary path")?;
+
+        println!("PRODUCTION MODE: Spawning backend from: {:?}", resource_path);
+
+        let mut command = Command::new(&resource_path);
+        command
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit());
+
+        let mut child = command.spawn()
+            .map_err(|e| format!("Failed to spawn backend binary: {}", e))?;
+
+        let stdin = child.stdin.take()
+            .ok_or("Failed to capture backend stdin")?;
+
+        let stdout = child.stdout.take()
+            .ok_or("Failed to capture backend stdout")?;
+
+        spawn_output_reader(window, stdout);
+
+        return Ok(PythonBackend {
+            stdin: Arc::new(Mutex::new(Some(stdin))),
+            _process: Arc::new(Mutex::new(Some(child))),
+        });
+    }
+}
+
+fn spawn_output_reader(window: Window, stdout: std::process::ChildStdout) {
+    // Spawn background task to read from backend stdout
     std::thread::spawn(move || {
         let reader = BufReader::new(stdout);
         for line in reader.lines() {
@@ -165,7 +209,7 @@ fn spawn_python_backend(window: Window) -> Result<PythonBackend, String> {
                     match serde_json::from_str::<Value>(&line) {
                         Ok(event) => {
                             // Emit event to frontend
-                            if let Err(e) = window_clone.emit("backend_event", event) {
+                            if let Err(e) = window.emit("backend_event", event) {
                                 eprintln!("Failed to emit backend event: {}", e);
                             }
                         }
@@ -175,18 +219,13 @@ fn spawn_python_backend(window: Window) -> Result<PythonBackend, String> {
                     }
                 }
                 Err(e) => {
-                    eprintln!("Error reading from Python stdout: {}", e);
+                    eprintln!("Error reading from backend stdout: {}", e);
                     break;
                 }
             }
         }
-        println!("Python stdout reader thread exiting");
+        println!("Backend stdout reader thread exiting");
     });
-
-    Ok(PythonBackend {
-        stdin: Arc::new(Mutex::new(Some(stdin))),
-        _process: Arc::new(Mutex::new(Some(child))),
-    })
 }
 
 fn main() {

@@ -30,6 +30,10 @@ python -m nuitka ^
     --enable-plugin=anti-bloat ^
     --nofollow-import-to=pytest,unittest,test ^
     --include-package-data=openai,pydantic ^
+    --include-module=cryptography ^
+    --include-module=orjson ^
+    --include-module=keyring ^
+    --include-module=sqlite3 ^
     app/main.py
 
 if %errorlevel% equ 0 (

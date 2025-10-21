@@ -1,14 +1,14 @@
 {
   "build": {
     "beforeDevCommand": "pnpm ui:dev",
-    "beforeBuildCommand": "pnpm ui:build",
+    "beforeBuildCommand": "pnpm ui:build && pnpm backend:build",
     "devPath": "http://localhost:1420",
     "distDir": "../ui/dist",
     "withGlobalTauri": false
   },
   "package": {
     "productName": "AssetForge",
-    "version": "0.1.0"
+    "version": "1.0.0"
   },
   "tauri": {
     "allowlist": {
@@ -60,7 +60,9 @@
         "providerShortName": null,
         "signingIdentity": null
       },
-      "resources": [],
+      "resources": [
+        "../backend/bin/**/*"
+      ],
       "shortDescription": "Digital Asset Factory",
       "targets": "all",
       "windows": {

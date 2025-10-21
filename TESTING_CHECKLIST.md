@@ -280,11 +280,11 @@ For PowerShell (if you prefer):
 **Scenario**: API fails during pipeline execution, state preserved for retry
 
 **Steps**:
-- [ ] Temporarily set invalid API key or disconnect network
-- [ ] Start full pipeline
-- [ ] Let it fail at some step (e.g., Planner)
-- [ ] Verify error displayed in UI (only once, not duplicate)
-- [ ] Check database state
+- [x] Temporarily set invalid API key or disconnect network
+- [x] Start full pipeline
+- [x] Let it fail at some step (e.g., Planner)
+- [x] Verify error displayed in UI (only once, not duplicate)
+- [x] Check database state
 
 **Expected Database State**:
 ```sql
@@ -298,10 +298,10 @@ SELECT * FROM activity_logs WHERE bundle_id = '<failed_bundle_id>' ORDER BY star
 ```
 
 **Recovery Steps**:
-- [ ] Restore valid API key
-- [ ] Re-run failed step using incremental command
-- [ ] Verify pipeline continues from where it failed
-- [ ] Confirm bundle completes successfully
+- [x] Restore valid API key
+- [x] Re-run failed step using incremental command
+- [x] Verify pipeline continues from where it failed
+- [x] Confirm bundle completes successfully
 
 **Success Criteria**:
 - [x] Error displayed once (no duplicates) ✅ **VALIDATED: Orchestrator fix applied - no duplicate logging**
@@ -317,10 +317,10 @@ SELECT * FROM activity_logs WHERE bundle_id = '<failed_bundle_id>' ORDER BY star
 **Scenario**: Missing or corrupted bundle data is detected
 
 **Steps**:
-- [ ] Manually corrupt bundle data (e.g., delete planner_output from DB)
-- [ ] Try to run Maker on that bundle
-- [ ] Verify proper error message shown
-- [ ] Confirm bundle not archived in invalid state
+- [x] Manually corrupt bundle data (e.g., delete planner_output from DB)
+- [x] Try to run Maker on that bundle
+- [x] Verify proper error message shown
+- [x] Confirm bundle not archived in invalid state
 
 **Success Criteria**:
 - ✅ Clear error message about missing data

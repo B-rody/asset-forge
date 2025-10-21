@@ -172,15 +172,11 @@ pnpm backend:build
 
 ## 📝 License
 
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## 🤝 Contributing
-
-Contributions welcome! Please feel free to submit a Pull Request.
+Proprietary Software - see [LICENSE](LICENSE) file for complete terms and conditions.
 
 ## 💡 Support
 
-For issues and questions, please open an issue on GitHub.
+For questions about using AssetForge, click the Help button (?) in the app's header bar for comprehensive documentation and tutorials.
 
 ---
 
