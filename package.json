@@ -1,14 +1,14 @@
 {
   "name": "assetforge",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.4",
   "type": "module",
   "description": "One-Click Digital Asset Factory",
   "author": "AssetForge Team",
   "license": "UNLICENSED",
   "scripts": {
     "dev": "tauri dev",
-    "build": "pnpm ui:build && pnpm backend:build && tauri build",
+    "build": "concurrently \"pnpm ui:build\" \"pnpm backend:build\" && tauri build",
     "ui:dev": "vite",
     "ui:build": "tsc && vite build",
     "ui:preview": "vite preview",

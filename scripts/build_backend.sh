@@ -26,6 +26,7 @@ echo "Compiling with Nuitka..."
 python -m nuitka \
     --standalone \
     --onefile \
+    --jobs=0 \
     --output-dir=bin \
     --output-filename=assetforge_backend \
     --assume-yes-for-downloads \
@@ -41,6 +42,13 @@ python -m nuitka \
 echo ""
 echo "Build successful!"
 echo "Binary: backend/bin/assetforge_backend"
+
+# Clean up Nuitka build artifacts to reduce bundle size
+echo "Cleaning build artifacts..."
+rm -rf bin/main.build
+rm -rf bin/main.dist
+rm -rf bin/main.onefile-build
+echo "✅ Backend build completed successfully!"
 
 deactivate
 cd ..

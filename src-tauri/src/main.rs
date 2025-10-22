@@ -5,10 +5,13 @@ use tauri::{Manager, Window, AppHandle, State};
 use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
-use std::process::{Command, Stdio, Child, ChildStdin};
+use std::process::{Command, Stdio, Child, ChildStdin, ChildStderr};
 use std::io::{BufRead, BufReader, Write};
 use std::sync::Arc;
 use parking_lot::Mutex;
+use log::{error, info, LevelFilter};
+use simplelog::{WriteLogger, Config as LogConfig};
+use chrono::Local;
 
 // State to manage Python backend process
 struct PythonBackend {
@@ -103,9 +106,13 @@ fn get_config_path(app_handle: &AppHandle) -> Result<PathBuf, String> {
 // Send command to Python backend via stdin
 #[tauri::command]
 async fn send_to_backend(
-    backend: State<'_, PythonBackend>,
+    backend: State<'_, Option<PythonBackend>>,
     command: Value
 ) -> Result<(), String> {
+    // Check if backend is available
+    let backend = backend.inner().as_ref()
+        .ok_or("Backend is offline")?;
+
     let mut stdin_guard = backend.stdin.lock();
 
     if let Some(stdin) = stdin_guard.as_mut() {
@@ -136,7 +143,7 @@ fn spawn_python_backend(window: Window) -> Result<PythonBackend, String> {
             .ok_or("Failed to get parent directory")?
             .join("backend");
 
-        println!("DEV MODE: Spawning Python backend from: {:?}", backend_dir);
+        info!("DEV MODE: Spawning Python backend from: {:?}", backend_dir);
 
         let mut command = Command::new("python");
         command
@@ -144,7 +151,7 @@ fn spawn_python_backend(window: Window) -> Result<PythonBackend, String> {
             .current_dir(&backend_dir)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::inherit());
+            .stderr(Stdio::piped());
 
         let mut child = command.spawn()
             .map_err(|e| format!("Failed to spawn Python backend: {}", e))?;
@@ -155,7 +162,11 @@ fn spawn_python_backend(window: Window) -> Result<PythonBackend, String> {
         let stdout = child.stdout.take()
             .ok_or("Failed to capture Python stdout")?;
 
+        let stderr = child.stderr.take()
+            .ok_or("Failed to capture Python stderr")?;
+
         spawn_output_reader(window, stdout);
+        spawn_stderr_logger(stderr);
 
         return Ok(PythonBackend {
             stdin: Arc::new(Mutex::new(Some(stdin))),
@@ -167,18 +178,24 @@ fn spawn_python_backend(window: Window) -> Result<PythonBackend, String> {
     {
         // PRODUCTION MODE: Run compiled backend from resources
         let app_handle = window.app_handle();
+
+        // Try to resolve resource - Tauri extracts to _up_ directory on Windows
         let resource_path = app_handle
             .path_resolver()
-            .resolve_resource("bin/assetforge_backend.exe")
-            .ok_or("Failed to resolve backend binary path")?;
+            .resolve_resource("_up_/backend/bin/assetforge_backend.exe")
+            .or_else(|| {
+                // Fallback: try without _up_ prefix (for other platforms)
+                app_handle.path_resolver().resolve_resource("backend/bin/assetforge_backend.exe")
+            })
+            .ok_or("Failed to resolve backend binary path. Tried: _up_/backend/bin/assetforge_backend.exe")?;
 
-        println!("PRODUCTION MODE: Spawning backend from: {:?}", resource_path);
+        info!("PRODUCTION MODE: Spawning backend from: {:?}", resource_path);
 
         let mut command = Command::new(&resource_path);
         command
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::inherit());
+            .stderr(Stdio::piped());
 
         let mut child = command.spawn()
             .map_err(|e| format!("Failed to spawn backend binary: {}", e))?;
@@ -189,7 +206,11 @@ fn spawn_python_backend(window: Window) -> Result<PythonBackend, String> {
         let stdout = child.stdout.take()
             .ok_or("Failed to capture backend stdout")?;
 
+        let stderr = child.stderr.take()
+            .ok_or("Failed to capture backend stderr")?;
+
         spawn_output_reader(window, stdout);
+        spawn_stderr_logger(stderr);
 
         return Ok(PythonBackend {
             stdin: Arc::new(Mutex::new(Some(stdin))),
@@ -210,37 +231,109 @@ fn spawn_output_reader(window: Window, stdout: std::process::ChildStdout) {
                         Ok(event) => {
                             // Emit event to frontend
                             if let Err(e) = window.emit("backend_event", event) {
-                                eprintln!("Failed to emit backend event: {}", e);
+                                error!("Failed to emit backend event: {}", e);
                             }
                         }
                         Err(e) => {
-                            eprintln!("Failed to parse backend event: {} (line: {})", e, line);
+                            error!("Failed to parse backend event: {} (line: {})", e, line);
                         }
                     }
                 }
                 Err(e) => {
-                    eprintln!("Error reading from backend stdout: {}", e);
+                    error!("Error reading from backend stdout: {}", e);
                     break;
                 }
             }
         }
-        println!("Backend stdout reader thread exiting");
+        info!("Backend stdout reader thread exiting");
     });
+}
+
+fn spawn_stderr_logger(stderr: ChildStderr) {
+    // Spawn background task to log backend stderr
+    std::thread::spawn(move || {
+        let reader = BufReader::new(stderr);
+        for line in reader.lines() {
+            match line {
+                Ok(line) => {
+                    error!("Backend stderr: {}", line);
+                }
+                Err(e) => {
+                    error!("Error reading backend stderr: {}", e);
+                    break;
+                }
+            }
+        }
+    });
+}
+
+fn setup_logging(app_handle: &AppHandle) -> Result<(), String> {
+    // Get logs directory
+    let app_data = app_handle
+        .path_resolver()
+        .app_data_dir()
+        .ok_or("Failed to resolve app data directory")?;
+
+    let logs_dir = app_data.join("logs");
+    fs::create_dir_all(&logs_dir)
+        .map_err(|e| format!("Failed to create logs directory: {}", e))?;
+
+    // Create log file with current date
+    let date = Local::now().format("%Y-%m-%d").to_string();
+    let log_file_path = logs_dir.join(format!("{}.log", date));
+
+    let log_file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_file_path)
+        .map_err(|e| format!("Failed to open log file: {}", e))?;
+
+    // Setup logger
+    WriteLogger::init(LevelFilter::Info, LogConfig::default(), log_file)
+        .map_err(|e| format!("Failed to initialize logger: {}", e))?;
+
+    Ok(())
 }
 
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
-            let window = app.get_window("main").unwrap();
+            // Setup logging first
+            if let Err(e) = setup_logging(&app.handle()) {
+                eprintln!("Warning: Failed to setup logging: {}", e);
+            }
+
+            info!("AssetForge v1.0.4 starting");
+
+            let window = app.get_window("main")
+                .ok_or("Failed to get main window")?;
 
             #[cfg(debug_assertions)]
             {
                 window.open_devtools();
             }
 
-            // Spawn Python backend
-            let backend = spawn_python_backend(window.clone())?;
-            app.manage(backend);
+            // Spawn Python backend (non-fatal if it fails)
+            match spawn_python_backend(window.clone()) {
+                Ok(backend) => {
+                    info!("Backend spawned successfully");
+                    app.manage(Some(backend));
+                }
+                Err(e) => {
+                    error!("Failed to spawn backend: {}", e);
+                    // Show error dialog but continue launching
+                    let _ = tauri::api::dialog::message(
+                        Some(&window),
+                        "AssetForge - Backend Error",
+                        format!(
+                            "Failed to start backend process:\n\n{}\n\nThe app will run in limited mode. Check logs at:\n%APPDATA%\\AssetForge\\logs\\",
+                            e
+                        )
+                    );
+                    // Store None to indicate backend is offline
+                    app.manage(None::<PythonBackend>);
+                }
+            };
 
             Ok(())
         })

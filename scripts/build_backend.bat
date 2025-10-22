@@ -24,6 +24,9 @@ echo Compiling with Nuitka...
 python -m nuitka ^
     --standalone ^
     --onefile ^
+    --jobs=0 ^
+    --windows-dependency-tool=pefile ^
+    --onefile-tempdir-spec=%%TEMP%%\assetforge ^
     --output-dir=bin ^
     --output-filename=assetforge_backend.exe ^
     --assume-yes-for-downloads ^
@@ -40,6 +43,13 @@ if %errorlevel% equ 0 (
     echo.
     echo Build successful!
     echo Binary: backend\bin\assetforge_backend.exe
+
+    REM Clean up Nuitka build artifacts to reduce bundle size
+    echo Cleaning build artifacts...
+    if exist "bin\main.build" rmdir /s /q "bin\main.build"
+    if exist "bin\main.dist" rmdir /s /q "bin\main.dist"
+    if exist "bin\main.onefile-build" rmdir /s /q "bin\main.onefile-build"
+    echo ✅ Backend build completed successfully!
 ) else (
     echo.
     echo Build failed!
