@@ -165,12 +165,13 @@ fn spawn_python_backend(window: Window) -> Result<PythonBackend, String> {
         let stderr = child.stderr.take()
             .ok_or("Failed to capture Python stderr")?;
 
-        spawn_output_reader(window, stdout);
+        spawn_output_reader(window.clone(), stdout);
         spawn_stderr_logger(stderr);
+        spawn_process_monitor(window, Arc::new(Mutex::new(Some(child))));
 
         return Ok(PythonBackend {
             stdin: Arc::new(Mutex::new(Some(stdin))),
-            _process: Arc::new(Mutex::new(Some(child))),
+            _process: Arc::new(Mutex::new(None)), // Process monitoring thread owns it now
         });
     }
 
@@ -180,14 +181,22 @@ fn spawn_python_backend(window: Window) -> Result<PythonBackend, String> {
         let app_handle = window.app_handle();
 
         // Try to resolve resource - Tauri extracts to _up_ directory on Windows
+        // Standalone mode: binary is in main.dist/main.exe
         let resource_path = app_handle
             .path_resolver()
-            .resolve_resource("_up_/backend/bin/assetforge_backend.exe")
+            .resolve_resource("_up_/backend/bin/main.dist/main.exe")
             .or_else(|| {
                 // Fallback: try without _up_ prefix (for other platforms)
-                app_handle.path_resolver().resolve_resource("backend/bin/assetforge_backend.exe")
+                app_handle.path_resolver().resolve_resource("backend/bin/main.dist/main.exe")
             })
-            .ok_or("Failed to resolve backend binary path. Tried: _up_/backend/bin/assetforge_backend.exe")?;
+            .or_else(|| {
+                // Unix/Mac: no .exe extension
+                app_handle.path_resolver().resolve_resource("_up_/backend/bin/main.dist/main")
+            })
+            .or_else(|| {
+                app_handle.path_resolver().resolve_resource("backend/bin/main.dist/main")
+            })
+            .ok_or("Failed to resolve backend binary path. Tried: _up_/backend/bin/main.dist/main.exe")?;
 
         info!("PRODUCTION MODE: Spawning backend from: {:?}", resource_path);
 
@@ -209,12 +218,13 @@ fn spawn_python_backend(window: Window) -> Result<PythonBackend, String> {
         let stderr = child.stderr.take()
             .ok_or("Failed to capture backend stderr")?;
 
-        spawn_output_reader(window, stdout);
+        spawn_output_reader(window.clone(), stdout);
         spawn_stderr_logger(stderr);
+        spawn_process_monitor(window, Arc::new(Mutex::new(Some(child))));
 
         return Ok(PythonBackend {
             stdin: Arc::new(Mutex::new(Some(stdin))),
-            _process: Arc::new(Mutex::new(Some(child))),
+            _process: Arc::new(Mutex::new(None)), // Process monitoring thread owns it now
         });
     }
 }
@@ -264,6 +274,38 @@ fn spawn_stderr_logger(stderr: ChildStderr) {
                 }
             }
         }
+        error!("Backend stderr stream closed");
+    });
+}
+
+fn spawn_process_monitor(window: Window, process: Arc<Mutex<Option<Child>>>) {
+    // Monitor the backend process and log when it exits
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(500));
+
+        let mut process_guard = process.lock();
+        if let Some(mut child) = process_guard.take() {
+            match child.wait() {
+                Ok(status) => {
+                    if status.success() {
+                        info!("Backend process exited successfully with code: {:?}", status.code());
+                    } else {
+                        error!("Backend process crashed with exit code: {:?}", status.code());
+                        error!("This usually indicates a missing dependency or import error in the compiled binary");
+
+                        // Emit error to frontend
+                        let _ = window.emit("backend_event", serde_json::json!({
+                            "event": "error",
+                            "step": null,
+                            "message": format!("Backend crashed on startup with exit code: {:?}. Check logs at %APPDATA%/AssetForge/logs/", status.code())
+                        }));
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to wait for backend process: {}", e);
+                }
+            }
+        }
     });
 }
 
@@ -303,7 +345,7 @@ fn main() {
                 eprintln!("Warning: Failed to setup logging: {}", e);
             }
 
-            info!("AssetForge v1.0.4 starting");
+            info!("AssetForge v1.0.8 starting");
 
             let window = app.get_window("main")
                 .ok_or("Failed to get main window")?;

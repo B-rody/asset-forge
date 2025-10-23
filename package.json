@@ -1,7 +1,7 @@
 {
   "name": "assetforge",
   "private": true,
-  "version": "1.0.4",
+  "version": "1.0.8",
   "type": "module",
   "description": "One-Click Digital Asset Factory",
   "author": "AssetForge Team",

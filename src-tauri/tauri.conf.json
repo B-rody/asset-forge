@@ -8,7 +8,7 @@
   },
   "package": {
     "productName": "AssetForge",
-    "version": "1.0.4"
+    "version": "1.0.8"
   },
   "tauri": {
     "allowlist": {
@@ -61,7 +61,8 @@
         "signingIdentity": null
       },
       "resources": [
-        "../backend/bin/**/*"
+        "../backend/bin/main.dist",
+        "../LICENSE"
       ],
       "shortDescription": "Digital Asset Factory",
       "targets": "all",

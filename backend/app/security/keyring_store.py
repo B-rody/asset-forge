@@ -1,61 +1,73 @@
 """
-Secure API key storage using OS keyring
-Windows: Credential Manager
-macOS: Keychain
-Linux: Secret Service API
+Secure API key storage using encrypted file storage
+Uses Fernet (AES-128) encryption via CryptoManager
 """
 
-import keyring
 from typing import Optional
+from pathlib import Path
 from app.logger import setup_logger
+from app.security.crypto import crypto
+from app.settings import settings
 
 logger = setup_logger(__name__)
 
-SERVICE_NAME = "AssetForge"
-KEY_NAME = "openai_api_key"
+# Encrypted API key file location
+API_KEY_FILE = settings.config_dir / ".api_key.enc"
 
 
 class KeyringStore:
-    """Manages secure storage of API keys"""
-    
+    """Manages secure storage of API keys using encrypted file storage"""
+
     @staticmethod
     def save_api_key(api_key: str) -> bool:
-        """Save API key to system keyring"""
+        """Save API key to encrypted file"""
         try:
-            keyring.set_password(SERVICE_NAME, KEY_NAME, api_key)
-            logger.info("API key saved to system keyring")
+            # Ensure config directory exists
+            settings.config_dir.mkdir(parents=True, exist_ok=True)
+
+            # Encrypt and save
+            encrypted = crypto.encrypt(api_key)
+            API_KEY_FILE.write_bytes(encrypted)
+
+            logger.info("API key saved to encrypted storage")
             return True
         except Exception as e:
             logger.error(f"Failed to save API key: {e}")
             return False
-    
+
     @staticmethod
     def get_api_key() -> Optional[str]:
-        """Retrieve API key from system keyring"""
+        """Retrieve API key from encrypted file"""
         try:
-            api_key = keyring.get_password(SERVICE_NAME, KEY_NAME)
-            if api_key:
-                logger.info("API key retrieved from system keyring")
+            if not API_KEY_FILE.exists():
+                return None
+
+            # Read and decrypt
+            encrypted = API_KEY_FILE.read_bytes()
+            api_key = crypto.decrypt(encrypted)
+
+            logger.info("API key retrieved from encrypted storage")
             return api_key
         except Exception as e:
             logger.error(f"Failed to retrieve API key: {e}")
             return None
-    
+
     @staticmethod
     def delete_api_key() -> bool:
-        """Delete API key from system keyring"""
+        """Delete API key from encrypted file"""
         try:
-            keyring.delete_password(SERVICE_NAME, KEY_NAME)
-            logger.info("API key deleted from system keyring")
+            if API_KEY_FILE.exists():
+                API_KEY_FILE.unlink()
+                logger.info("API key deleted from encrypted storage")
             return True
         except Exception as e:
             logger.error(f"Failed to delete API key: {e}")
             return False
-    
+
     @staticmethod
     def has_api_key() -> bool:
-        """Check if API key exists in keyring"""
-        return KeyringStore.get_api_key() is not None
+        """Check if API key exists in encrypted storage"""
+        return API_KEY_FILE.exists()
 
 
 # Convenience functions

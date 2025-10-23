@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, BookOpen, Workflow, Lightbulb, HelpCircle } from "lucide-react";
+import { X, BookOpen, Workflow, Lightbulb, HelpCircle, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface HelpDialogProps {
@@ -7,7 +7,7 @@ interface HelpDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-type HelpTab = "getting-started" | "pipeline" | "workflows" | "faq";
+type HelpTab = "getting-started" | "pipeline" | "workflows" | "faq" | "about";
 
 export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
   const [activeTab, setActiveTab] = useState<HelpTab>("getting-started");
@@ -88,6 +88,17 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
             <HelpCircle className="h-4 w-4" />
             FAQ & Tips
           </button>
+          <button
+            onClick={() => setActiveTab("about")}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-t-md transition-colors",
+              "hover:bg-accent hover:text-accent-foreground",
+              activeTab === "about" && "bg-primary text-primary-foreground"
+            )}
+          >
+            <FileText className="h-4 w-4" />
+            About & License
+          </button>
         </div>
 
         {/* Content */}
@@ -96,6 +107,7 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
           {activeTab === "pipeline" && <PipelineContent />}
           {activeTab === "workflows" && <WorkflowsContent />}
           {activeTab === "faq" && <FAQContent />}
+          {activeTab === "about" && <AboutContent />}
         </div>
       </div>
     </div>
@@ -337,6 +349,90 @@ function WorkflowsContent() {
         <p className="text-sm font-semibold mb-2">Viewing History</p>
         <p className="text-sm text-muted-foreground">
           All completed bundles are saved in the <strong>History</strong> tab, where you can review details and open output folders.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function AboutContent() {
+  return (
+    <div className="space-y-6 prose prose-sm dark:prose-invert max-w-none">
+      <div>
+        <h3 className="text-lg font-semibold mb-3">About AssetForge</h3>
+        <div className="space-y-2 text-sm text-muted-foreground">
+          <p><strong>Version:</strong> 1.0.7</p>
+          <p><strong>Copyright:</strong> © 2025 AssetForge. All Rights Reserved.</p>
+          <p><strong>Description:</strong> One-Click Digital Asset Factory - An autonomous, schema-driven pipeline that generates complete digital product bundles for marketplaces.</p>
+        </div>
+      </div>
+
+      <div>
+        <h4 className="font-semibold mb-3">Software License Agreement</h4>
+        <div className="bg-muted rounded-lg p-4 text-xs font-mono overflow-y-auto max-h-96 whitespace-pre-wrap border border-border">
+{`PROPRIETARY SOFTWARE LICENSE AGREEMENT
+
+Copyright (c) 2025 AssetForge. All Rights Reserved.
+
+This software and associated documentation files (the "Software") are proprietary
+and confidential to AssetForge.
+
+GRANT OF LICENSE
+
+Subject to the terms of this Agreement and payment of the applicable license fee,
+you are granted a limited, non-exclusive, non-transferable license to:
+
+1. Install and use the Software on devices you own or control
+2. Use the Software for personal or commercial purposes
+
+RESTRICTIONS
+
+You may NOT:
+
+1. Distribute, sell, lease, rent, lend, or sublicense the Software
+2. Modify, reverse engineer, decompile, or disassemble the Software
+3. Remove or alter any proprietary notices or labels on the Software
+4. Share your copy of the Software with others
+5. Use the Software to provide services to third parties
+6. Create derivative works based on the Software
+
+INTELLECTUAL PROPERTY
+
+All title, ownership rights, and intellectual property rights in and to the
+Software remain with AssetForge. The Software is protected by copyright laws
+and international treaty provisions.
+
+TERMINATION
+
+This license is effective until terminated. Your rights under this license will
+terminate automatically without notice if you fail to comply with any term of
+this Agreement.
+
+NO WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE, AND NONINFRINGEMENT. THE ENTIRE RISK AS TO THE QUALITY AND
+PERFORMANCE OF THE SOFTWARE IS WITH YOU.
+
+LIMITATION OF LIABILITY
+
+IN NO EVENT SHALL ASSETFORGE BE LIABLE FOR ANY SPECIAL, INCIDENTAL, INDIRECT, OR
+CONSEQUENTIAL DAMAGES WHATSOEVER (INCLUDING, WITHOUT LIMITATION, DAMAGES FOR LOSS
+OF BUSINESS PROFITS, BUSINESS INTERRUPTION, LOSS OF BUSINESS INFORMATION, OR ANY
+OTHER PECUNIARY LOSS) ARISING OUT OF THE USE OF OR INABILITY TO USE THE SOFTWARE.
+
+GOVERNING LAW
+
+This Agreement shall be governed by and construed in accordance with the laws of
+the jurisdiction in which AssetForge operates, without regard to its conflict of
+law provisions.
+
+By installing or using the Software, you acknowledge that you have read this
+Agreement, understand it, and agree to be bound by its terms and conditions.`}
+        </div>
+        <p className="text-xs text-muted-foreground mt-3">
+          By using AssetForge, you acknowledge that you have read and agree to this license agreement.
         </p>
       </div>
     </div>

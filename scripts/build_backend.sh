@@ -21,33 +21,51 @@ echo "Installing dependencies..."
 pip install -r requirements.txt
 pip install nuitka ordered-set zstandard
 
-# Build with Nuitka
-echo "Compiling with Nuitka..."
+# Build with Nuitka (standalone mode for debugging)
+echo "Compiling with Nuitka in STANDALONE mode..."
+echo "This creates a folder with all dependencies visible for debugging."
 python -m nuitka \
     --standalone \
-    --onefile \
     --jobs=0 \
     --output-dir=bin \
-    --output-filename=assetforge_backend \
     --assume-yes-for-downloads \
-    --enable-plugin=anti-bloat \
     --nofollow-import-to=pytest,unittest,test \
-    --include-package-data=openai,pydantic \
-    --include-module=cryptography \
-    --include-module=orjson \
-    --include-module=keyring \
-    --include-module=sqlite3 \
+    --include-package=app \
+    --include-package=openai \
+    --include-package=pydantic \
+    --include-package=pydantic_core \
+    --include-package=rich \
+    --include-package=orjson \
+    --include-package=cryptography \
+    --include-package=platformdirs \
+    --include-package=jsonschema \
+    --include-package=dateutil \
+    --include-package=tenacity \
+    --include-data-dir=app/pipeline/agents/prompts=app/pipeline/agents/prompts \
+    --include-data-dir=app/pipeline/agents/asset_agents/prompts=app/pipeline/agents/asset_agents/prompts \
+    --include-data-dir=app/pipeline/agents/schemas=app/pipeline/agents/schemas \
+    --include-data-dir=app/pipeline/agents/asset_agents/schemas=app/pipeline/agents/asset_agents/schemas \
+    --include-data-file=bin/pandoc=bin/pandoc \
+    --include-data-dir=bin/wkhtmltopdf=bin/wkhtmltopdf \
     app/main.py
 
 echo ""
-echo "Build successful!"
-echo "Binary: backend/bin/assetforge_backend"
+echo "========================================"
+echo "STANDALONE MODE OUTPUT"
+echo "========================================"
+echo "Executable: backend/bin/main.dist/main"
+echo "Libraries folder: backend/bin/main.dist/"
+echo ""
+echo "To inspect bundled libraries, check the main.dist folder."
+echo "All dependencies should be visible there."
+echo ""
+echo "To test: cd backend/bin/main.dist && ./main"
+echo "========================================"
+echo ""
 
-# Clean up Nuitka build artifacts to reduce bundle size
-echo "Cleaning build artifacts..."
+# Don't clean up in standalone mode - we need to inspect the output
+echo "Cleaning temporary build artifacts only..."
 rm -rf bin/main.build
-rm -rf bin/main.dist
-rm -rf bin/main.onefile-build
 echo "✅ Backend build completed successfully!"
 
 deactivate

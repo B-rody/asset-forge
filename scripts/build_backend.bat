@@ -19,36 +19,53 @@ echo Installing dependencies...
 pip install -r requirements.txt
 pip install nuitka ordered-set zstandard
 
-REM Build with Nuitka
-echo Compiling with Nuitka...
+REM Build with Nuitka (standalone mode for debugging)
+echo Compiling with Nuitka in STANDALONE mode...
+echo This creates a folder with all dependencies visible for debugging.
 python -m nuitka ^
     --standalone ^
-    --onefile ^
     --jobs=0 ^
-    --windows-dependency-tool=pefile ^
-    --onefile-tempdir-spec=%%TEMP%%\assetforge ^
     --output-dir=bin ^
-    --output-filename=assetforge_backend.exe ^
     --assume-yes-for-downloads ^
-    --enable-plugin=anti-bloat ^
     --nofollow-import-to=pytest,unittest,test ^
-    --include-package-data=openai,pydantic ^
-    --include-module=cryptography ^
-    --include-module=orjson ^
-    --include-module=keyring ^
-    --include-module=sqlite3 ^
+    --include-package=app ^
+    --include-package=openai ^
+    --include-package=pydantic ^
+    --include-package=pydantic_core ^
+    --include-package=rich ^
+    --include-package=orjson ^
+    --include-package=cryptography ^
+    --include-package=platformdirs ^
+    --include-package=jsonschema ^
+    --include-package=dateutil ^
+    --include-package=tenacity ^
+    --include-data-dir=app/pipeline/agents/prompts=app/pipeline/agents/prompts ^
+    --include-data-dir=app/pipeline/agents/asset_agents/prompts=app/pipeline/agents/asset_agents/prompts ^
+    --include-data-dir=app/pipeline/agents/schemas=app/pipeline/agents/schemas ^
+    --include-data-dir=app/pipeline/agents/asset_agents/schemas=app/pipeline/agents/asset_agents/schemas ^
+    --include-data-file=bin/pandoc.exe=bin/pandoc.exe ^
+    --include-data-dir=bin/wkhtmltopdf=bin/wkhtmltopdf ^
+    --windows-console-mode=disable ^
     app/main.py
 
 if %errorlevel% equ 0 (
     echo.
     echo Build successful!
-    echo Binary: backend\bin\assetforge_backend.exe
+    echo.
+    echo ========================================
+    echo STANDALONE MODE OUTPUT
+    echo ========================================
+    echo Executable: backend\bin\main.dist\main.exe
+    echo DLLs folder: backend\bin\main.dist\
+    echo.
+    echo To inspect bundled DLLs, check the main.dist folder.
+    echo All dependencies should be visible there.
+    echo.
+    echo To test: cd backend\bin\main.dist ^&^& main.exe
+    echo ========================================
+    echo.
 
-    REM Clean up Nuitka build artifacts to reduce bundle size
-    echo Cleaning build artifacts...
-    if exist "bin\main.build" rmdir /s /q "bin\main.build"
-    if exist "bin\main.dist" rmdir /s /q "bin\main.dist"
-    if exist "bin\main.onefile-build" rmdir /s /q "bin\main.onefile-build"
+    REM Don't clean up in standalone mode - we need to inspect the output
     echo ✅ Backend build completed successfully!
 ) else (
     echo.
