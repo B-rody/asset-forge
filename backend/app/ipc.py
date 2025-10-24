@@ -520,9 +520,9 @@ class IPCServer:
                         activities = activity_log_queries.get_by_bundle(bundle.bundle_id)
 
                         if activities:
-                            # Find earliest started_at and latest completed_at
-                            start_times = [datetime.fromisoformat(a.started_at) for a in activities if a.started_at]
-                            end_times = [datetime.fromisoformat(a.completed_at) for a in activities if a.completed_at]
+                            # Find earliest started_at and latest completed_at (only for completed activities)
+                            start_times = [datetime.fromisoformat(a.started_at) for a in activities if a.started_at and a.status == "completed"]
+                            end_times = [datetime.fromisoformat(a.completed_at) for a in activities if a.completed_at and a.status == "completed"]
 
                             if start_times and end_times:
                                 earliest_start = min(start_times)
