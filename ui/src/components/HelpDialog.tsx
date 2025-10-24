@@ -449,7 +449,8 @@ function FAQContent() {
           <h4 className="font-semibold text-sm mb-1">How much does it cost to run?</h4>
           <p className="text-sm text-muted-foreground">
             AssetForge itself is a one-time purchase, but it uses your OpenAI API key.
-            Each full bundle typically costs ~$2-5 in API usage. You only pay for what you generate.
+            As of October 2025, running the full auto pipeline (research, auto-pick, and generate) typically costs 20-50 cents in API usage.
+            You only pay for what you generate. Note that costs may change as OpenAI API pricing changes.
           </p>
         </div>
 
