@@ -44,6 +44,7 @@ AssetForge executes a local AI pipeline that:
 - **Node.js** 18+ and **pnpm** (or npm)
 - **Rust** 1.70+ (for Tauri)
 - **Python** 3.11+
+- **Pandoc** 3.x - Download from [pandoc releases](https://github.com/jgm/pandoc/releases) and place `pandoc.exe` in `backend/bin/`
 - **OpenAI API Key** (for generation)
 
 ## 🚀 Quick Start

@@ -36,6 +36,15 @@ build-python/
 
 # Backend binaries
 backend/bin/
+# Exception: Include bundled dependencies needed for builds
+# Note: pandoc.exe is too large for GitHub (229MB > 100MB limit)
+# Download from: https://github.com/jgm/pandoc/releases
+!backend/bin/wkhtmltopdf/
+!backend/bin/wkhtmltopdf/bin/
+!backend/bin/wkhtmltopdf/bin/*.exe
+!backend/bin/wkhtmltopdf/bin/*.dll
+!backend/bin/wkhtmltopdf/include/
+!backend/bin/wkhtmltopdf/lib/
 backend/build/
 backend/dist/
 
