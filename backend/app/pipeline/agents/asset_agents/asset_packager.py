@@ -36,7 +36,8 @@ class PackagerAgent(BaseAgent):
         # Determine base path based on whether we're running as compiled binary or source
         if getattr(sys, 'frozen', False):
             # Running as compiled binary (Nuitka)
-            base_path = Path(sys.executable).parent
+            # Resolve to get the full path (handles Windows 8.3 short names like ASSETF~1)
+            base_path = Path(sys.executable).parent.resolve()
         else:
             # Running in dev mode - navigate from backend/app/pipeline/agents/asset_agents/ to backend/
             base_path = Path(__file__).parent.parent.parent.parent.parent
@@ -48,6 +49,9 @@ class PackagerAgent(BaseAgent):
             pandoc_exe = base_path / 'bin' / 'pandoc'
         else:
             pandoc_exe = base_path / 'bin' / 'pandoc'
+
+        # Resolve the full path to handle any symlinks or short names
+        pandoc_exe = pandoc_exe.resolve()
 
         # Use bundled pandoc if it exists, otherwise fallback to system pandoc
         if pandoc_exe.exists():
@@ -70,7 +74,8 @@ class PackagerAgent(BaseAgent):
         # Determine base path based on whether we're running as compiled binary or source
         if getattr(sys, 'frozen', False):
             # Running as compiled binary (Nuitka)
-            base_path = Path(sys.executable).parent
+            # Resolve to get the full path (handles Windows 8.3 short names like ASSETF~1)
+            base_path = Path(sys.executable).parent.resolve()
         else:
             # Running in dev mode - navigate from backend/app/pipeline/agents/asset_agents/ to backend/
             base_path = Path(__file__).parent.parent.parent.parent.parent
@@ -82,6 +87,9 @@ class PackagerAgent(BaseAgent):
             wkhtmltopdf_exe = base_path / 'bin' / 'wkhtmltopdf' / 'bin' / 'wkhtmltopdf'
         else:
             wkhtmltopdf_exe = base_path / 'bin' / 'wkhtmltopdf' / 'bin' / 'wkhtmltopdf'
+
+        # Resolve the full path to handle any symlinks or short names
+        wkhtmltopdf_exe = wkhtmltopdf_exe.resolve()
 
         # Use bundled wkhtmltopdf if it exists, otherwise fallback to system wkhtmltopdf
         if wkhtmltopdf_exe.exists():
@@ -459,30 +467,44 @@ class PackagerAgent(BaseAgent):
                     env['PATH'] = f"{wkhtmltopdf_dir}:{env.get('PATH', '')}"
 
                 # Run pandoc to convert markdown to PDF using wkhtmltopdf with formatting
+                pandoc_cmd = [
+                    pandoc_path,
+                    str(md_file),
+                    "-o",
+                    str(pdf_path),
+                    "--from", "markdown-yaml_metadata_block",
+                    f"--pdf-engine={wkhtmltopdf_path}",
+                    "--css", "data:text/css,body{font-family:Arial,sans-serif;max-width:100%;margin:0.5in;background:white;color:#333;}h1{color:#2c3e50;border-bottom:2px solid #3498db;padding-bottom:0.3em;margin-top:0.5em;}h2{color:#34495e;border-bottom:1px solid #bdc3c7;padding-bottom:0.2em;margin-top:0.4em;}table{border-collapse:collapse;width:100%;margin:1em 0;}th,td{border:1px solid #ddd;padding:8px;text-align:left;}th{background-color:#f2f2f2;}",
+                    "--metadata", "pagetitle=AssetForge Digital Product",
+                    "--pdf-engine-opt=--margin-top", "--pdf-engine-opt=0.5in",
+                    "--pdf-engine-opt=--margin-bottom", "--pdf-engine-opt=0.5in",
+                    "--pdf-engine-opt=--margin-left", "--pdf-engine-opt=0.5in",
+                    "--pdf-engine-opt=--margin-right", "--pdf-engine-opt=0.5in"
+                ]
+
+                self.logger.debug(f"Running pandoc command: {' '.join(pandoc_cmd[:6])}...")
+                self.logger.debug(f"Using wkhtmltopdf: {wkhtmltopdf_path}")
+
                 result = subprocess.run(
-                    [
-                        pandoc_path,
-                        str(md_file),
-                        "-o",
-                        str(pdf_path),
-                        f"--pdf-engine={wkhtmltopdf_path}",
-                        "--css", "data:text/css,body{font-family:Arial,sans-serif;max-width:100%;margin:0.5in;background:white;color:#333;}h1{color:#2c3e50;border-bottom:2px solid #3498db;padding-bottom:0.3em;margin-top:0.5em;}h2{color:#34495e;border-bottom:1px solid #bdc3c7;padding-bottom:0.2em;margin-top:0.4em;}table{border-collapse:collapse;width:100%;margin:1em 0;}th,td{border:1px solid #ddd;padding:8px;text-align:left;}th{background-color:#f2f2f2;}",
-                        "--metadata", "pagetitle=AssetForge Digital Product",
-                        "--pdf-engine-opt=--margin-top", "--pdf-engine-opt=0.5in",
-                        "--pdf-engine-opt=--margin-bottom", "--pdf-engine-opt=0.5in",
-                        "--pdf-engine-opt=--margin-left", "--pdf-engine-opt=0.5in",
-                        "--pdf-engine-opt=--margin-right", "--pdf-engine-opt=0.5in"
-                    ],
+                    pandoc_cmd,
                     capture_output=True,
                     text=True,
                     timeout=60,
                     env=env
                 )
 
+                # Log return code and output for debugging
+                self.logger.debug(f"Pandoc return code: {result.returncode}")
+                if result.stdout:
+                    self.logger.debug(f"Pandoc stdout: {result.stdout[:1000]}")
+                if result.stderr:
+                    self.logger.debug(f"Pandoc stderr: {result.stderr[:1000]}")
+
                 # Check if PDF was successfully created (even if Pandoc had warnings)
                 if pdf_path.exists() and pdf_path.stat().st_size > 0:
+                    pdf_size = pdf_path.stat().st_size
                     converted_pdfs.append(pdf_path)
-                    self.logger.info(f"✓ Converted: {md_file.name} -> {pdf_name}")
+                    self.logger.info(f"✓ Converted: {md_file.name} -> {pdf_name} ({pdf_size} bytes)")
                     emit({"event": "log", "step": self.step_name, "message": f"✓ Converted {pdf_name}"})
 
                     # Log warnings if Pandoc exited with non-zero code
@@ -498,14 +520,24 @@ class PackagerAgent(BaseAgent):
                     # PDF was NOT created - this is a real failure
                     stderr_lower = result.stderr.lower() if result.stderr else ""
 
+                    # Build comprehensive error message
+                    error_parts = [f"Return code: {result.returncode}"]
+
+                    if result.stderr:
+                        error_parts.append(f"STDERR: {result.stderr[:2000]}")
+                    if result.stdout:
+                        error_parts.append(f"STDOUT: {result.stdout[:1000]}")
+
                     # Check if error is due to missing wkhtmltopdf
                     if "wkhtmltopdf" in stderr_lower or "pdf-engine" in stderr_lower:
                         error_msg = "wkhtmltopdf not found. Please download from https://wkhtmltopdf.org/downloads.html and place in backend/bin/"
                     else:
-                        error_msg = result.stderr[:500] if result.stderr else "Unknown error - PDF not created"
+                        error_msg = " | ".join(error_parts) if error_parts else "Unknown error - PDF not created"
 
-                    # Log for debugging
-                    self.logger.error(f"Pandoc failed for {md_file.name}: {error_msg}")
+                    # Log for debugging with full details
+                    self.logger.error(f"Pandoc failed for {md_file.name}")
+                    self.logger.error(f"  Command: {' '.join(pandoc_cmd[:6])}...")
+                    self.logger.error(f"  Error: {error_msg}")
                     emit({"event": "log", "step": self.step_name, "message": f"⚠ Failed to convert {md_file.name}"})
 
                     # Track failure for later exception

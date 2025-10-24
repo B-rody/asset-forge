@@ -1,6 +1,6 @@
 [package]
 name = "assetforge"
-version = "1.0.8"
+version = "1.0.15"
 description = "One-Click Digital Asset Factory"
 authors = ["AssetForge Team"]
 license = "SEE LICENSE IN LICENSE"

@@ -46,7 +46,11 @@ python -m nuitka \
     --include-data-dir=app/pipeline/agents/schemas=app/pipeline/agents/schemas \
     --include-data-dir=app/pipeline/agents/asset_agents/schemas=app/pipeline/agents/asset_agents/schemas \
     --include-data-file=bin/pandoc=bin/pandoc \
-    --include-data-dir=bin/wkhtmltopdf=bin/wkhtmltopdf \
+    --include-data-file=bin/wkhtmltopdf/bin/wkhtmltopdf=bin/wkhtmltopdf/bin/wkhtmltopdf \
+    --include-data-file=bin/wkhtmltopdf/bin/wkhtmltoimage=bin/wkhtmltopdf/bin/wkhtmltoimage \
+    --include-data-file=bin/wkhtmltopdf/bin/vcruntime140.dll=bin/wkhtmltopdf/bin/vcruntime140.dll \
+    --include-data-file=bin/wkhtmltopdf/bin/vcruntime140_1.dll=bin/wkhtmltopdf/bin/vcruntime140_1.dll \
+    --include-data-file=bin/wkhtmltopdf/bin/msvcp140.dll=bin/wkhtmltopdf/bin/msvcp140.dll \
     app/main.py
 
 echo ""

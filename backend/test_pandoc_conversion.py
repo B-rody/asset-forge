@@ -22,7 +22,7 @@ def get_pandoc_path() -> str:
     Returns path to bundled pandoc in backend/bin/, or falls back to system pandoc
     """
     # Determine base path - we're running from backend/
-    base_path = Path(__file__).parent
+    base_path = Path(__file__).parent.resolve()
 
     # Platform-specific executable name
     if sys.platform == 'win32':
@@ -31,6 +31,9 @@ def get_pandoc_path() -> str:
         pandoc_exe = base_path / 'bin' / 'pandoc'
     else:
         pandoc_exe = base_path / 'bin' / 'pandoc'
+
+    # Resolve the full path to handle any symlinks or short names
+    pandoc_exe = pandoc_exe.resolve()
 
     # Use bundled pandoc if it exists, otherwise fallback to system pandoc
     if pandoc_exe.exists():
@@ -48,7 +51,7 @@ def get_wkhtmltopdf_path() -> str:
     Returns path to bundled wkhtmltopdf in backend/bin/wkhtmltopdf/bin/
     """
     # Determine base path - we're running from backend/
-    base_path = Path(__file__).parent
+    base_path = Path(__file__).parent.resolve()
 
     # Platform-specific executable name (nested in wkhtmltopdf/bin subdirectory)
     if sys.platform == 'win32':
@@ -57,6 +60,9 @@ def get_wkhtmltopdf_path() -> str:
         wkhtmltopdf_exe = base_path / 'bin' / 'wkhtmltopdf' / 'bin' / 'wkhtmltopdf'
     else:
         wkhtmltopdf_exe = base_path / 'bin' / 'wkhtmltopdf' / 'bin' / 'wkhtmltopdf'
+
+    # Resolve the full path to handle any symlinks or short names
+    wkhtmltopdf_exe = wkhtmltopdf_exe.resolve()
 
     # Use bundled wkhtmltopdf if it exists, otherwise fallback to system wkhtmltopdf
     if wkhtmltopdf_exe.exists():

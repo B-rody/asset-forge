@@ -44,7 +44,12 @@ python -m nuitka ^
     --include-data-dir=app/pipeline/agents/schemas=app/pipeline/agents/schemas ^
     --include-data-dir=app/pipeline/agents/asset_agents/schemas=app/pipeline/agents/asset_agents/schemas ^
     --include-data-file=bin/pandoc.exe=bin/pandoc.exe ^
-    --include-data-dir=bin/wkhtmltopdf=bin/wkhtmltopdf ^
+    --include-data-file=bin/wkhtmltopdf/bin/wkhtmltopdf.exe=bin/wkhtmltopdf/bin/wkhtmltopdf.exe ^
+    --include-data-file=bin/wkhtmltopdf/bin/wkhtmltoimage.exe=bin/wkhtmltopdf/bin/wkhtmltoimage.exe ^
+    --include-data-file=bin/wkhtmltopdf/bin/wkhtmltox.dll=bin/wkhtmltopdf/bin/wkhtmltox.dll ^
+    --include-data-file=bin/wkhtmltopdf/bin/vcruntime140.dll=bin/wkhtmltopdf/bin/vcruntime140.dll ^
+    --include-data-file=bin/wkhtmltopdf/bin/vcruntime140_1.dll=bin/wkhtmltopdf/bin/vcruntime140_1.dll ^
+    --include-data-file=bin/wkhtmltopdf/bin/msvcp140.dll=bin/wkhtmltopdf/bin/msvcp140.dll ^
     --windows-console-mode=disable ^
     app/main.py
 
