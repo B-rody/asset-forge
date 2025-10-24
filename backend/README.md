@@ -95,9 +95,10 @@ The backend communicates with the frontend via JSON-Lines over stdio.
 
 ## Security
 
-- API keys stored in OS keyring (Windows Credential Manager, macOS Keychain, Linux Secret Service)
+- API keys stored in an encrypted file on your local device, managed entirely by the app
 - Prompts encrypted at rest with Fernet (AES-128)
 - Backend compiled with Nuitka for IP protection
+- No AssetForge servers; your data and API key never leave your device except to call OpenAI's API
 
 ## License
 

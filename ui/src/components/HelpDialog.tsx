@@ -137,7 +137,7 @@ function GettingStartedContent() {
           <li>Paste it into AssetForge Settings (⚙️ icon in header)</li>
         </ol>
         <p className="text-xs text-muted-foreground mt-2 bg-blue-50 dark:bg-blue-950/30 p-3 rounded border border-blue-200 dark:border-blue-900">
-          <strong>Note:</strong> Your API key is stored securely in your system keyring and never transmitted except to OpenAI's servers.
+          <strong>Note:</strong> Your API key is stored in an encrypted file on your local device and never transmitted except to OpenAI's servers. There are no AssetForge servers.
         </p>
       </div>
 
@@ -473,8 +473,8 @@ function FAQContent() {
         <div>
           <h4 className="font-semibold text-sm mb-1">Is my API key secure?</h4>
           <p className="text-sm text-muted-foreground">
-            Yes! Your API key is stored in your system keyring (Windows Credential Manager) and never transmitted
-            anywhere except directly to OpenAI's API. It's never sent to AssetForge servers (there are none!).
+            Yes! Your API key is stored in an encrypted file on your local device, managed entirely by the app.
+            It's never transmitted anywhere except directly to OpenAI's API. There are no AssetForge servers.
           </p>
         </div>
 

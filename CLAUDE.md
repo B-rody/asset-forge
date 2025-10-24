@@ -225,10 +225,11 @@ Tauri runs this before packaging via:
 
 ## 🔒 Security Model
 
-- All prompts stored encrypted (`/prompts/blobs/`)  
-- AES/Fernet decryption only in memory  
-- API key stored via system keyring (DPAPI / Keychain)  
-- No cloud sync; all data remains local  
+- All prompts stored encrypted (`/prompts/blobs/`)
+- AES/Fernet decryption only in memory
+- API key stored in an encrypted file on local device, managed by the app
+- No cloud sync; all data remains local
+- No AssetForge servers; API key only transmitted to OpenAI
 - Compiled binary hides all logic & prompts
 
 ---

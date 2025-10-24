@@ -240,7 +240,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               </p>
             ) : (
               <p className="mt-1 text-xs text-muted-foreground">
-                Your API key is stored securely in your system keyring and never transmitted except to OpenAI.
+                Your API key is stored in an encrypted file on your local device and never transmitted except to OpenAI. There are no AssetForge servers.
               </p>
             )}
             {error && (

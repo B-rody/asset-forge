@@ -18,7 +18,7 @@ AssetForge executes a local AI pipeline that:
 - 🎨 **Modern Desktop UI**: Tauri + React + TypeScript + Tailwind CSS + shadcn/ui
 - 🐍 **Local Python Backend**: Compiled with Nuitka, communicates via JSON-Lines over stdio
 - 🔐 **IP Protection**: Encrypted prompts at rest, decrypt in RAM only
-- 🔑 **BYOL**: Bring Your Own License – use your OpenAI API key (stored securely via OS keyring)
+- 🔑 **BYOL**: Bring Your Own License – use your OpenAI API key (stored securely in an encrypted local file)
 - 🌓 **Light/Dark Mode**: Beautiful UI that adapts to your preference
 - 📊 **Real-time Progress**: Live logs and progress tracking for each pipeline step
 
@@ -138,9 +138,10 @@ Re-execute a specific pipeline step:
 ## 🔐 Security
 
 - **Encrypted Prompts**: All prompts encrypted at rest with Fernet (AES-128)
-- **OS Keyring**: API keys stored securely via platform keyring (Windows Credential Manager, macOS Keychain, Linux Secret Service)
+- **Encrypted API Key**: API keys stored in an encrypted file on your local device, managed entirely by the app
 - **Compiled Binary**: Python backend compiled with Nuitka for IP protection
 - **No Network Server**: All communication via stdio (no HTTP server exposure)
+- **No AssetForge Servers**: Your data and API key never leave your device except to call OpenAI's API
 
 ## 📊 IPC Protocol
 
