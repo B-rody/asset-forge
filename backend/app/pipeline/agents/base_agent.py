@@ -9,7 +9,15 @@ from typing import Dict, Any, Optional, Callable, TYPE_CHECKING
 import json
 import jsonschema
 import re
+import time
 from openai import OpenAI
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception,
+    RetryError
+)
 
 from app.logger import setup_logger
 
@@ -307,6 +315,197 @@ class BaseAgent(ABC):
         else:
             # Return primitives (int, float, bool, None) unchanged
             return data
+
+    def _is_retryable_error(self, exception: Exception) -> bool:
+        """
+        Check if an exception is a transient error that should be retried.
+
+        Args:
+            exception: The exception to check
+
+        Returns:
+            bool: True if the error should be retried
+        """
+        error_msg = str(exception).lower()
+
+        # Check for common transient error patterns
+        retryable_patterns = [
+            "peer closed connection",
+            "incomplete chunked read",
+            "connection reset",
+            "timeout",
+            "read timeout",
+            "connection error",
+            "connection refused"
+        ]
+
+        return any(pattern in error_msg for pattern in retryable_patterns)
+
+    def _call_openai_with_retry(
+        self,
+        emit: Callable[[Dict[str, Any]], None],
+        **api_params
+    ) -> Dict[str, Any]:
+        """
+        Call OpenAI API with automatic retry logic for transient errors (streaming version).
+
+        Retries up to 3 times with exponential backoff (2s, 4s, 8s) for:
+        - Connection errors (peer closed, incomplete chunked read)
+        - Timeout errors
+        - Network errors
+
+        Args:
+            emit: Callback function for progress updates
+            **api_params: Parameters to pass to client.responses.create() with stream=True
+
+        Returns:
+            Dict[str, Any]: Parsed response from OpenAI
+
+        Raises:
+            ValueError: After exhausting all retries or non-retryable error
+        """
+        max_attempts = 3
+        attempt = 0
+
+        while attempt < max_attempts:
+            try:
+                # Emit log for retry attempts (skip for first attempt)
+                if attempt > 0:
+                    wait_seconds = 2 ** attempt  # Exponential backoff: 2s, 4s, 8s
+                    emit({
+                        "event": "log",
+                        "step": self.step_name,
+                        "message": f"Retry {attempt}/{max_attempts - 1}: Connection interrupted, retrying in {wait_seconds}s..."
+                    })
+                    time.sleep(wait_seconds)
+                    emit({
+                        "event": "log",
+                        "step": self.step_name,
+                        "message": "Retrying OpenAI API call..."
+                    })
+
+                # Make the API call
+                response = self.client.responses.create(**api_params)
+
+                # Handle streaming response
+                emit({"event": "log", "step": self.step_name, "message": "Processing stream..."})
+                result = self._handle_stream(response, emit)
+
+                # Success! Return the result
+                return result
+
+            except Exception as e:
+                attempt += 1
+                error_msg = str(e)
+
+                # Check if this is a retryable error
+                if not self._is_retryable_error(e):
+                    # Non-retryable error - fail immediately
+                    self.logger.error(f"Non-retryable error: {error_msg}")
+                    raise
+
+                # Log the retry-able error
+                self.logger.warning(f"Attempt {attempt}/{max_attempts} failed: {error_msg}")
+
+                # If we've exhausted all attempts, raise with helpful message
+                if attempt >= max_attempts:
+                    final_error = (
+                        f"OpenAI API connection failed after {max_attempts} automatic retries. "
+                        "This indicates intermittent issues with OpenAI's API. "
+                        "Please wait a few minutes and try again. "
+                        f"Original error: {error_msg}"
+                    )
+                    self.logger.error(final_error)
+                    emit({"event": "error", "step": self.step_name, "message": final_error})
+                    raise ValueError(final_error) from e
+
+                # Otherwise, continue to next retry attempt
+                emit({
+                    "event": "log",
+                    "step": self.step_name,
+                    "message": f"⚠ Connection error detected: {error_msg[:100]}..."
+                })
+
+    def _call_openai_no_stream_with_retry(
+        self,
+        emit: Callable[[Dict[str, Any]], None],
+        **api_params
+    ):
+        """
+        Call OpenAI API with automatic retry logic for transient errors (non-streaming version).
+
+        Retries up to 3 times with exponential backoff (2s, 4s, 8s) for:
+        - Connection errors (peer closed, incomplete chunked read)
+        - Timeout errors
+        - Network errors
+
+        Args:
+            emit: Callback function for progress updates
+            **api_params: Parameters to pass to client.responses.create() without stream
+
+        Returns:
+            Response object from OpenAI (status, output, etc.)
+
+        Raises:
+            ValueError: After exhausting all retries or non-retryable error
+        """
+        max_attempts = 3
+        attempt = 0
+
+        while attempt < max_attempts:
+            try:
+                # Emit log for retry attempts (skip for first attempt)
+                if attempt > 0:
+                    wait_seconds = 2 ** attempt  # Exponential backoff: 2s, 4s, 8s
+                    emit({
+                        "event": "log",
+                        "step": self.step_name,
+                        "message": f"Retry {attempt}/{max_attempts - 1}: Connection interrupted, retrying in {wait_seconds}s..."
+                    })
+                    time.sleep(wait_seconds)
+                    emit({
+                        "event": "log",
+                        "step": self.step_name,
+                        "message": "Retrying OpenAI API call..."
+                    })
+
+                # Make the API call (non-streaming)
+                response = self.client.responses.create(**api_params)
+
+                # Success! Return the response object
+                return response
+
+            except Exception as e:
+                attempt += 1
+                error_msg = str(e)
+
+                # Check if this is a retryable error
+                if not self._is_retryable_error(e):
+                    # Non-retryable error - fail immediately
+                    self.logger.error(f"Non-retryable error: {error_msg}")
+                    raise
+
+                # Log the retry-able error
+                self.logger.warning(f"Attempt {attempt}/{max_attempts} failed: {error_msg}")
+
+                # If we've exhausted all attempts, raise with helpful message
+                if attempt >= max_attempts:
+                    final_error = (
+                        f"OpenAI API connection failed after {max_attempts} automatic retries. "
+                        "This indicates intermittent issues with OpenAI's API. "
+                        "Please wait a few minutes and try again. "
+                        f"Original error: {error_msg}"
+                    )
+                    self.logger.error(final_error)
+                    emit({"event": "error", "step": self.step_name, "message": final_error})
+                    raise ValueError(final_error) from e
+
+                # Otherwise, continue to next retry attempt
+                emit({
+                    "event": "log",
+                    "step": self.step_name,
+                    "message": f"⚠ Connection error detected: {error_msg[:100]}..."
+                })
 
     def _handle_stream(
         self,

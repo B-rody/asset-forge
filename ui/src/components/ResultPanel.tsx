@@ -296,11 +296,14 @@ export function ResultPanel({ result, onGenerateAssets, onPackageBundle, onNavig
                     "transition-colors"
                   )}
                 >
-                  <Package className="h-4 w-4" />
+                  {result.mode === "plan" && <Lightbulb className="h-4 w-4" />}
+                  {result.mode === "maker" && <Package className="h-4 w-4" />}
+                  {result.mode === "packager" && <Package className="h-4 w-4" />}
+                  {!result.mode && <FolderOpen className="h-4 w-4" />}
                   {result.mode === "plan" && "View Ideas in Library"}
                   {result.mode === "maker" && "View in Ready to Make"}
                   {result.mode === "packager" && "View in Ready to Package"}
-                  {!result.mode && "Go to Library"}
+                  {!result.mode && "View Library"}
                 </button>
               )}
             </div>

@@ -21,7 +21,7 @@ interface RunPanelProps {
   onQuickBuild?: () => void;
   onNavigateToLibrary?: () => void;
   isRunning: boolean;
-  runningMode?: "research" | "auto" | "plan" | null;
+  runningMode?: "research" | "research_and_build" | "quick_build" | "build_from_idea" | "plan" | null;
 }
 
 export function RunPanel({ activeTab, onResearchOnly, onAutoGenerate, onQuickBuild, onNavigateToLibrary, isRunning, runningMode }: RunPanelProps) {
@@ -484,10 +484,10 @@ export function RunPanel({ activeTab, onResearchOnly, onAutoGenerate, onQuickBui
 
             {/* Generate Bundle (Smart Auto) Dropdown */}
             <DropdownMenu>
-              <DropdownMenuTrigger asChild disabled={isRunning && runningMode !== "auto"}>
+              <DropdownMenuTrigger asChild disabled={isRunning && !(runningMode === "research_and_build" || runningMode === "quick_build" || runningMode === "build_from_idea")}>
                 <button
                   type="button"
-                  disabled={isRunning && runningMode !== "auto"}
+                  disabled={isRunning && !(runningMode === "research_and_build" || runningMode === "quick_build" || runningMode === "build_from_idea")}
                   className={cn(
                     "w-full relative overflow-hidden p-4 rounded-lg",
                     "transition-all duration-[250ms] ease-in-out",
@@ -497,7 +497,7 @@ export function RunPanel({ activeTab, onResearchOnly, onAutoGenerate, onQuickBui
                     // Hover state (when not running)
                     !isRunning && "hover:brightness-110 hover:shadow-[0_0_12px_#2563eb80]",
                     // Active/Generating state (only when this button is running)
-                    runningMode === "auto" && [
+                    (runningMode === "research_and_build" || runningMode === "quick_build" || runningMode === "build_from_idea") && [
                       "animate-gradient-shift",
                       "brightness-125",
                       "shadow-[0_0_24px_rgba(37,99,235,1)]",
@@ -510,7 +510,7 @@ export function RunPanel({ activeTab, onResearchOnly, onAutoGenerate, onQuickBui
                   )}
                 >
                   {/* Pulsing inner glow when generating */}
-                  {runningMode === "auto" && (
+                  {(runningMode === "research_and_build" || runningMode === "quick_build" || runningMode === "build_from_idea") && (
                     <span className="absolute inset-0 bg-[radial-gradient(circle,_rgba(59,130,246,0.5)_0%,_transparent_70%)] animate-pulse rounded-lg" />
                   )}
 
@@ -522,12 +522,19 @@ export function RunPanel({ activeTab, onResearchOnly, onAutoGenerate, onQuickBui
                     </div>
                     <div className="flex-1 text-left">
                       <div className="font-semibold">
-                        {runningMode === "auto" ? "Generating…" : "Generate Bundle"}
+                        {(runningMode === "research_and_build" || runningMode === "quick_build" || runningMode === "build_from_idea") ? "Generating…" : "Generate Bundle"}
                       </div>
                       <div className="text-xs opacity-90">
-                        {availableIdeasCount > 0
-                          ? `${availableIdeasCount} ideas ready • Choose mode below`
-                          : "Full pipeline with auto-research"}
+                        {runningMode === "research_and_build"
+                          ? "Full pipeline with auto-research"
+                          : runningMode === "quick_build"
+                            ? "Building from existing idea (auto-selected)"
+                            : runningMode === "build_from_idea"
+                              ? "Building from selected idea"
+                              : availableIdeasCount > 0
+                                ? `${availableIdeasCount} ideas ready • Choose mode below`
+                                : "Full pipeline with auto-research"
+                        }
                       </div>
                     </div>
                     {!isRunning && (

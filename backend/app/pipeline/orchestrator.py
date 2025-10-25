@@ -159,20 +159,14 @@ class PipelineOrchestrator:
             best_idea = max(ideas, key=lambda x: x.get("priority", 0))
             idea_title = best_idea.get("title", "Unknown")
 
-            # Get idea_id from database (recently saved ideas)
-            # Query for the idea by title from the most recent research session
-            latest_idea = None
-            all_ideas = self.idea_queries.get_all(limit=len(ideas))
-            for db_idea in all_ideas:
-                if db_idea.title == idea_title:
-                    latest_idea = db_idea
-                    break
+            # Get idea_id directly from researcher result (DB-generated ID)
+            # The researcher now adds 'idea_id' to each idea after saving to DB
+            idea_id = best_idea.get("idea_id")
 
-            if not latest_idea:
-                raise ValueError(f"Could not find saved idea: {idea_title}")
+            if not idea_id:
+                raise ValueError(f"Could not find saved idea ID for: {idea_title}. Database save may have failed.")
 
-            idea_id = latest_idea.idea_id
-            emit({"event": "log", "step": "Orchestrator", "message": f"Selected idea: {idea_title}"})
+            emit({"event": "log", "step": "Orchestrator", "message": f"Selected idea: {idea_title} (ID: {idea_id})"})
 
             # Step 3: Run planner
             emit({"event": "log", "step": "Planner", "message": "Designing bundle..."})

@@ -130,8 +130,9 @@ class MakerAgent(BaseAgent):
 
                 emit({"event": "log", "step": self.step_name, "message": f"Calling OpenAI API for {asset_name}..."})
 
-                # Call OpenAI API for single asset
-                response = self.client.responses.create(
+                # Call OpenAI API for single asset with automatic retry logic
+                response = self._call_openai_no_stream_with_retry(
+                    emit=emit,
                     model="gpt-5",
                     instructions=self.instructions,
                     input=asset_prompt,
@@ -207,8 +208,15 @@ class MakerAgent(BaseAgent):
             return {"status": "completed", "bundle_id": bundle_id}
 
         except Exception as e:
-            self.logger.error(f"Execution failed: {e}")
-            raise
+            # Retry logic is handled by _call_openai_no_stream_with_retry in base class
+            # This exception handler catches non-retryable errors or retry exhaustion
+            error_message = str(e)
+
+            self.logger.error(f"Execution failed: {error_message}")
+            # Error event already emitted by retry logic if applicable
+            if "after" not in error_message and "retries" not in error_message:
+                emit({"event": "error", "step": self.step_name, "message": error_message})
+            raise ValueError(error_message) from e
 
     def _load_bundle_data(
         self,

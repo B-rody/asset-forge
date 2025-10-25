@@ -54,28 +54,25 @@ class ResearcherAgent(BaseAgent):
 
             emit({"event": "log", "step": self.step_name, "message": "Calling OpenAI API..."})
 
-            # Call OpenAI API
-            response = self.client.responses.create(
+            # Call OpenAI API with automatic retry logic
+            result = self._call_openai_with_retry(
+                emit=emit,
                 model="gpt-5",
                 instructions=enhanced_instructions,
                 input=user_prompt,
                 tools=[{"type": "web_search"}],
-                reasoning={"effort" : "medium"},
+                reasoning={"effort": "medium"},
                 tool_choice="required",
                 stream=True,
                 text={
                     "format": {
                         "type": "json_schema",
-                        "name" : "researcher_response",
+                        "name": "researcher_response",
                         "schema": self.output_schema,
                         "strict": True
                     }
                 }
             )
-            
-            # Handle streaming response
-            emit({"event": "log", "step": self.step_name, "message": "Processing stream..."})
-            result = self._handle_stream(response, emit)
 
             # Validate against schema
             emit({"event": "log", "step": self.step_name, "message": "Validating response..."})
@@ -100,25 +97,19 @@ class ResearcherAgent(BaseAgent):
             return result
 
         except Exception as e:
+            # Retry logic is handled by _call_openai_with_retry in base class
+            # This exception handler catches non-retryable errors or retry exhaustion
             error_message = str(e)
+            elapsed = int((datetime.now() - start_time).total_seconds())
 
-            # Provide more helpful error messages for common failures
-            if "peer closed connection" in error_message.lower() or "incomplete chunked read" in error_message.lower():
-                elapsed = int((datetime.now() - start_time).total_seconds())
-                error_message = (
-                    "OpenAI API connection was interrupted during streaming. "
-                    "This can happen with long-running web searches. "
-                    f"The request ran for {elapsed}s before failing. "
-                    "Please try again - the system will automatically retry on transient errors."
-                )
-            elif "timeout" in error_message.lower():
-                error_message = (
-                    f"OpenAI API request timed out. The researcher agent with web_search can take 10+ minutes. "
-                    f"Current timeout is set to 15 minutes. Original error: {error_message}"
-                )
+            # Add elapsed time context for long-running operations
+            if elapsed > 60:
+                error_message = f"{error_message} (ran for {elapsed}s before failing)"
 
             self.logger.error(f"Execution failed: {error_message}")
-            emit({"event": "error", "step": self.step_name, "message": error_message})
+            # Error event already emitted by retry logic if applicable
+            if "after" not in error_message and "retries" not in error_message:
+                emit({"event": "error", "step": self.step_name, "message": error_message})
             raise ValueError(error_message) from e
 
     def _build_enhanced_instructions(self, emit: Callable[[Dict[str, Any]], None]) -> str:
@@ -201,9 +192,11 @@ class ResearcherAgent(BaseAgent):
         Save researcher results to database.
 
         Creates a research session and saves all generated ideas.
+        Updates the result dict with actual DB-generated idea_ids for each idea.
 
         Args:
-            result: The validated result from execute()
+            result: The validated result from execute() - will be modified in place
+                    to add 'idea_id' field to each idea in the 'ideas' list
 
         Returns:
             bool: True if saved successfully, False otherwise
@@ -263,7 +256,10 @@ class ResearcherAgent(BaseAgent):
 
                     if self.idea_queries.create(idea):
                         saved_count += 1
-                        self.logger.debug(f"  ✓ Saved idea {idx}/{len(ideas)}")
+                        # IMPORTANT: Update the result dict with the actual DB-generated idea_id
+                        # This allows orchestrator to use the real ID instead of searching by title
+                        idea_data["idea_id"] = idea_id
+                        self.logger.debug(f"  ✓ Saved idea {idx}/{len(ideas)} with ID {idea_id}")
                     else:
                         failed_ideas.append(f"{idea_id} ({idea_title[:30]})")
                         self.logger.warning(f"  ✗ Failed to save idea {idx}/{len(ideas)}: {idea_id}")

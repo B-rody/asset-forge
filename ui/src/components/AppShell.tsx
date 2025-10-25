@@ -41,7 +41,7 @@ export function AppShell() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [result, setResult] = useState<any>(null);
   const [pipelineStartTime, setPipelineStartTime] = useState<number | null>(null);
-  const [runningMode, setRunningMode] = useState<"research" | "auto" | "plan" | "maker" | "packager" | null>(null);
+  const [runningMode, setRunningMode] = useState<"research" | "research_and_build" | "quick_build" | "build_from_idea" | "plan" | "maker" | "packager" | null>(null);
   const [libraryDefaultTab, setLibraryDefaultTab] = useState<LibraryTab | undefined>(undefined);
 
   // Use refs to avoid resubscription race condition
@@ -295,7 +295,7 @@ export function AppShell() {
       { name: "Maker", status: "pending" },
       { name: "Packager", status: "pending" },
     ]);
-    setRunningMode("auto");
+    setRunningMode("build_from_idea");
 
     // Switch to Generate tab to show pipeline progress
     setActiveTab("one-click");
@@ -366,7 +366,7 @@ export function AppShell() {
   const handleAutoGenerate = () => {
     // Reset state for full pipeline
     handleRunStart();
-    setRunningMode("auto");
+    setRunningMode("research_and_build");
   };
 
   const handleQuickBuild = () => {
@@ -376,7 +376,7 @@ export function AppShell() {
       { name: "Maker", status: "pending" },
       { name: "Packager", status: "pending" },
     ]);
-    setRunningMode("auto");
+    setRunningMode("quick_build");
   };
 
   const handleOpenFolder = (path: string) => {

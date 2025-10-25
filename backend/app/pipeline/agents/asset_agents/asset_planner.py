@@ -49,8 +49,9 @@ class PlannerAgent(BaseAgent):
 
             emit({"event": "log", "step": self.step_name, "message": "Calling OpenAI API..."})
 
-            # Call OpenAI API
-            response = self.client.responses.create(
+            # Call OpenAI API with automatic retry logic
+            result = self._call_openai_with_retry(
+                emit=emit,
                 model="gpt-5",
                 instructions=self.instructions,
                 input=user_prompt,
@@ -67,10 +68,6 @@ class PlannerAgent(BaseAgent):
                     }
                 }
             )
-
-            # Handle streaming response
-            emit({"event": "log", "step": self.step_name, "message": "Processing stream..."})
-            result = self._handle_stream(response, emit)
 
             # Validate against schema
             emit({"event": "log", "step": self.step_name, "message": "Validating response..."})
@@ -95,8 +92,15 @@ class PlannerAgent(BaseAgent):
             return result
 
         except Exception as e:
-            self.logger.error(f"Execution failed: {e}")
-            raise
+            # Retry logic is handled by _call_openai_with_retry in base class
+            # This exception handler catches non-retryable errors or retry exhaustion
+            error_message = str(e)
+
+            self.logger.error(f"Execution failed: {error_message}")
+            # Error event already emitted by retry logic if applicable
+            if "after" not in error_message and "retries" not in error_message:
+                emit({"event": "error", "step": self.step_name, "message": error_message})
+            raise ValueError(error_message) from e
 
     def _load_idea_data(
         self,
