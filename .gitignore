@@ -80,6 +80,18 @@ output/
 .env.*.local
 secrets.json
 api_keys.txt
+*.enc
+
+# Python pip logs and install artifacts
+=*
+pip-*.txt
+
+# Nuitka crash reports
+*-crash-report.xml
+nuitka-crash-report.xml
+
+# Claude settings (IDE specific)
+.claude/
 
 # OS
 Thumbs.db

@@ -2,6 +2,8 @@
 
 **One-Click Digital Asset Factory** – An autonomous, schema-driven pipeline that generates complete digital product bundles for marketplaces like Etsy and Gumroad.
 
+---
+
 ## 🎯 What It Does
 
 AssetForge executes a local AI pipeline that:
@@ -13,6 +15,8 @@ AssetForge executes a local AI pipeline that:
 
 **Output**: Complete digital-product bundle (assets + Etsy/Gumroad metadata + QA report + ZIP)
 
+---
+
 ## ✨ Features
 
 - 🎨 **Modern Desktop UI**: Tauri + React + TypeScript + Tailwind CSS + shadcn/ui
@@ -21,6 +25,8 @@ AssetForge executes a local AI pipeline that:
 - 🔑 **BYOL**: Bring Your Own License – use your OpenAI API key (stored securely in an encrypted local file)
 - 🌓 **Light/Dark Mode**: Beautiful UI that adapts to your preference
 - 📊 **Real-time Progress**: Live logs and progress tracking for each pipeline step
+
+---
 
 ## 🛠️ Tech Stack
 
@@ -39,17 +45,86 @@ AssetForge executes a local AI pipeline that:
 - **Nuitka** – Python to binary compilation
 - **Keyring** – Secure API key storage
 
+---
+
 ## 📋 Prerequisites
 
+### Required Software
+
 - **Node.js** 18+ and **pnpm** (or npm)
+  - Install from [nodejs.org](https://nodejs.org/)
+  - Install pnpm: `npm install -g pnpm`
 - **Rust** 1.70+ (for Tauri)
+  - Install from [rustup.rs](https://rustup.rs/)
 - **Python** 3.11+
-- **Pandoc** 3.x - Download from [pandoc releases](https://github.com/jgm/pandoc/releases) and place `pandoc.exe` in `backend/bin/`
+  - Install from [python.org](https://www.python.org/downloads/)
 - **OpenAI API Key** (for generation)
+  - Get yours at [platform.openai.com](https://platform.openai.com/api-keys)
 
-## 🚀 Quick Start
+### External Dependencies
 
-### 1. Install Dependencies
+AssetForge requires two external tools for document conversion. These are **not included** in the repository due to size constraints:
+
+#### 1. **Pandoc** (Required)
+- **Purpose**: Converts Markdown to various document formats
+- **Download**: [Pandoc Releases](https://github.com/jgm/pandoc/releases)
+- **Version**: 3.x or higher
+- **Installation Location**: 
+  - Place `pandoc.exe` (Windows) or `pandoc` (macOS/Linux) in `backend/bin/`
+  - Example: `backend/bin/pandoc.exe`
+
+#### 2. **wkhtmltopdf** (Required)
+- **Purpose**: Converts HTML to PDF with high fidelity
+- **Download**: [wkhtmltopdf Downloads](https://wkhtmltopdf.org/downloads.html)
+- **Installation Location**:
+  - Extract the full `wkhtmltopdf` folder to `backend/bin/`
+  - Final structure should be:
+    ```
+    backend/bin/wkhtmltopdf/
+    ├── bin/
+    │   ├── wkhtmltopdf.exe
+    │   ├── wkhtmltoimage.exe
+    │   ├── wkhtmltox.dll
+    │   └── vcruntime140.dll
+    ├── include/
+    ├── lib/
+    └── uninstall.exe
+    ```
+
+> **Note**: The `.gitignore` already excludes `backend/bin/pandoc.exe` to prevent committing large binaries. Make sure to download these tools before running or building AssetForge.
+
+---
+
+## 🚀 Development Setup
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/B-rody/asset-forge.git
+cd asset-forge
+```
+
+### 2. Install External Dependencies
+
+**Download and place the required tools:**
+
+1. **Pandoc**:
+   - Download from [Pandoc Releases](https://github.com/jgm/pandoc/releases)
+   - Extract `pandoc.exe` (or `pandoc` on Unix) to `backend/bin/`
+
+2. **wkhtmltopdf**:
+   - Download from [wkhtmltopdf Downloads](https://wkhtmltopdf.org/downloads.html)
+   - Extract the entire `wkhtmltopdf` folder to `backend/bin/`
+
+**Verify your setup:**
+```bash
+# Check that the files exist
+ls backend/bin/pandoc.exe              # Windows
+ls backend/bin/pandoc                  # macOS/Linux
+ls backend/bin/wkhtmltopdf/bin/        # Should show wkhtmltopdf.exe and related DLLs
+```
+
+### 3. Install Project Dependencies
 
 ```bash
 # Install frontend dependencies
@@ -61,36 +136,128 @@ pip install -r requirements.txt
 cd ..
 ```
 
-### 2. Development Mode
+### 4. Run in Development Mode
 
 ```bash
-# Run in development mode (hot-reload enabled)
+# Run the full app in development mode (hot-reload enabled)
 pnpm dev
 ```
 
 This will:
-- Start the Vite dev server
+- Start the Vite dev server at `http://localhost:1420`
 - Launch Tauri in development mode
-- Run a mock backend for testing UI
+- Run the Python backend with live reload
 
-### 3. First Run Setup
-
-1. Click the **Settings** button (⚙️) in the header
-2. Paste your **OpenAI API Key**
-3. Click **Save**
-4. Start generating! 🎉
-
-### 4. Production Build
+**Alternative: Run components separately**
 
 ```bash
-# Build the complete application
+# Terminal 1: Run frontend only
+pnpm ui:dev
+
+# Terminal 2: Run backend only
+pnpm backend:dev
+
+# Terminal 3: Run Tauri (after frontend is running)
+pnpm tauri dev
+```
+
+### 5. First Run Setup
+
+1. Launch the app
+2. Click the **Settings** button (⚙️) in the header
+3. Paste your **OpenAI API Key**
+4. Click **Save**
+5. Start generating! 🎉
+
+Your API key is stored encrypted locally at:
+- Windows: `%APPDATA%\AssetForge\.api_key.enc`
+- macOS: `~/Library/Application Support/AssetForge/.api_key.enc`
+- Linux: `~/.local/share/AssetForge/.api_key.enc`
+
+---
+
+## 📦 Building for Production
+
+### Prerequisites for Building
+
+1. Complete all steps in **Development Setup** above
+2. Ensure external dependencies (Pandoc, wkhtmltopdf) are in place
+3. Install Python build dependencies:
+   ```bash
+   cd backend
+   pip install nuitka ordered-set zstandard
+   cd ..
+   ```
+
+### Build Process
+
+#### Full Build (Recommended)
+
+```bash
+# Build everything: frontend, backend, and installer
 pnpm build
 ```
 
 This will:
-- Build the optimized React frontend
-- Compile Python backend to native binary with Nuitka
-- Bundle everything into a standalone executable
+1. Build the optimized React frontend (`ui/dist/`)
+2. Compile Python backend to native binary with Nuitka (`backend/bin/main.dist/`)
+3. Bundle everything into a Tauri installer
+
+**Output locations:**
+- **Windows**: `src-tauri/target/release/bundle/nsis/AssetForge_1.1.0_x64-setup.exe`
+- **macOS**: `src-tauri/target/release/bundle/dmg/AssetForge_1.1.0_x64.dmg`
+- **Linux**: `src-tauri/target/release/bundle/deb/assetforge_1.1.0_amd64.deb`
+
+#### Component-Specific Builds
+
+```bash
+# Build frontend only
+pnpm ui:build
+
+# Build backend only (Nuitka compilation)
+pnpm backend:build
+# Or use platform-specific scripts:
+# Windows: scripts\build_backend.bat
+# Unix: ./scripts/build_backend.sh
+
+# Build Tauri app only (requires frontend + backend already built)
+pnpm tauri build
+```
+
+### Build Configuration
+
+The build process is configured in:
+- **Tauri**: `src-tauri/tauri.conf.json`
+- **Nuitka**: `scripts/build_backend.bat` or `scripts/build_backend.sh`
+- **Frontend**: `vite.config.ts`
+
+**What gets bundled:**
+- Compiled Python backend (`backend/bin/main.dist/`)
+- External tools (Pandoc, wkhtmltopdf) embedded in the binary
+- Encrypted prompts and schemas
+- React frontend assets
+- License file
+
+### Troubleshooting Builds
+
+**Issue**: `pandoc.exe not found` during build
+- **Solution**: Ensure `backend/bin/pandoc.exe` exists before building
+
+**Issue**: `wkhtmltopdf` errors
+- **Solution**: Verify the full `backend/bin/wkhtmltopdf/` folder structure is present
+
+**Issue**: Nuitka compilation fails
+- **Solution**: 
+  1. Install Visual Studio Build Tools (Windows) or GCC (Linux/macOS)
+  2. Ensure Python 3.11+ is installed
+  3. Try building with `--jobs=1` flag in build script for better error messages
+
+**Issue**: Installer size is too large
+- **Solution**: This is expected (200-300MB) due to bundled Python runtime, AI dependencies, and external tools
+
+---
+
+## 🎯 Usage
 
 ## 📁 Project Structure
 
