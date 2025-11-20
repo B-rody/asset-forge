@@ -357,12 +357,13 @@ class PackagerAgent(BaseAgent):
 
     def _sanitize_markdown_images(self, md_file: Path, emit: Callable[[Dict[str, Any]], None]) -> bool:
         """
-        Sanitize markdown file by removing malformed image syntax that breaks Pandoc.
+        Sanitize markdown file by removing malformed image syntax and converting relative paths to absolute.
 
-        Detects and removes patterns like:
+        Detects and fixes:
         - ![](Alt text: description)  # alt text in path position
         - ![Alt text: description]()  # empty path
-        - Other malformed image references
+        - Relative image paths that need to be absolute for wkhtmltopdf
+        - Missing image files
 
         Args:
             md_file: Path to markdown file to sanitize
@@ -403,6 +404,52 @@ class PackagerAgent(BaseAgent):
             if matches3:
                 self.logger.warning(f"Found {len(matches3)} image(s) with empty paths in {md_file.name}")
                 content = re.sub(pattern3, '', content)
+
+            # Pattern 4: Convert relative image paths to absolute paths
+            # This fixes wkhtmltopdf looking in wrong directory for images
+            def replace_relative_path(match):
+                alt_text = match.group(1)
+                img_path = match.group(2)
+
+                # Skip if already absolute path (starts with / or C:\ or http)
+                if img_path.startswith(('/', 'http://', 'https://', 'file://')) or ':' in img_path[:3]:
+                    return match.group(0)
+
+                # Convert relative path to absolute
+                # md_file.parent is already an absolute path from rglob()
+                # Use resolve() to handle any symlinks and normalize the path (handles Windows 8.3 short names)
+                absolute_path = (md_file.parent / img_path).resolve()
+
+                # Check if image file exists
+                if not absolute_path.exists():
+                    self.logger.warning(f"Image file not found: {img_path} (resolved to {absolute_path})")
+                    emit({"event": "log", "step": self.step_name, "message": f"⚠ Missing image: {img_path}"})
+                    # Remove the image reference entirely if file doesn't exist
+                    return ''
+
+                # Convert to file:// URL for wkhtmltopdf
+                # .as_uri() creates a proper file:// URL that works cross-platform
+                # Example: file:///C:/Users/User/AppData/Local/AssetForge/bundles/.../image.svg
+                file_url = absolute_path.as_uri()
+
+                # Log the conversion for debugging (helps diagnose production issues)
+                self.logger.debug(f"Image path conversion:")
+                self.logger.debug(f"  Original: {img_path}")
+                self.logger.debug(f"  Absolute: {absolute_path}")
+                self.logger.debug(f"  File URL: {file_url}")
+
+                return f'![{alt_text}]({file_url})'
+
+            # Match markdown image syntax: ![alt text](path)
+            pattern4 = r'!\[([^\]]*)\]\(([^)]+)\)'
+            content_before = content
+            content = re.sub(pattern4, replace_relative_path, content)
+
+            if content != content_before:
+                converted_count = len(re.findall(r'!\[[^\]]*\]\(file://', content))
+                if converted_count > 0:
+                    self.logger.info(f"Converted {converted_count} relative image path(s) to absolute")
+                    emit({"event": "log", "step": self.step_name, "message": f"✓ Converted {converted_count} image path(s) to absolute"})
 
             # If content was modified, write it back
             if content != original_content:
