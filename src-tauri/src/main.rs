@@ -180,23 +180,15 @@ fn spawn_python_backend(window: Window) -> Result<PythonBackend, String> {
         // PRODUCTION MODE: Run compiled backend from resources
         let app_handle = window.app_handle();
 
-        // Try to resolve resource - Tauri extracts to _up_ directory on Windows
-        // Standalone mode: binary is in main.dist/main.exe
+        // Try to resolve resource - portable build has main.dist directly alongside exe
         let resource_path = app_handle
             .path_resolver()
-            .resolve_resource("_up_/backend/bin/main.dist/main.exe")
-            .or_else(|| {
-                // Fallback: try without _up_ prefix (for other platforms)
-                app_handle.path_resolver().resolve_resource("backend/bin/main.dist/main.exe")
-            })
+            .resolve_resource("main.dist/main.exe")
             .or_else(|| {
                 // Unix/Mac: no .exe extension
-                app_handle.path_resolver().resolve_resource("_up_/backend/bin/main.dist/main")
+                app_handle.path_resolver().resolve_resource("main.dist/main")
             })
-            .or_else(|| {
-                app_handle.path_resolver().resolve_resource("backend/bin/main.dist/main")
-            })
-            .ok_or("Failed to resolve backend binary path. Tried: _up_/backend/bin/main.dist/main.exe")?;
+            .ok_or("Failed to resolve backend binary path. Tried: main.dist/main.exe")?;
 
         info!("PRODUCTION MODE: Spawning backend from: {:?}", resource_path);
 
@@ -297,7 +289,7 @@ fn spawn_process_monitor(window: Window, process: Arc<Mutex<Option<Child>>>) {
                         let _ = window.emit("backend_event", serde_json::json!({
                             "event": "error",
                             "step": null,
-                            "message": format!("Backend crashed on startup with exit code: {:?}. Check logs at %APPDATA%/AssetForge/logs/", status.code())
+                            "message": format!("Backend crashed on startup with exit code: {:?}. Check logs at %APPDATA%/AssetFurnace/logs/", status.code())
                         }));
                     }
                 }
@@ -345,7 +337,7 @@ fn main() {
                 eprintln!("Warning: Failed to setup logging: {}", e);
             }
 
-            info!("AssetForge v1.0.8 starting");
+            info!("AssetFurnace v1.1.2 starting");
 
             let window = app.get_window("main")
                 .ok_or("Failed to get main window")?;
@@ -366,9 +358,9 @@ fn main() {
                     // Show error dialog but continue launching
                     let _ = tauri::api::dialog::message(
                         Some(&window),
-                        "AssetForge - Backend Error",
+                        "AssetFurnace - Backend Error",
                         format!(
-                            "Failed to start backend process:\n\n{}\n\nThe app will run in limited mode. Check logs at:\n%APPDATA%\\AssetForge\\logs\\",
+                            "Failed to start backend process:\n\n{}\n\nThe app will run in limited mode. Check logs at:\n%APPDATA%\\AssetFurnace\\logs\\",
                             e
                         )
                     );

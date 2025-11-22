@@ -57,11 +57,11 @@ export function HeaderBar() {
           <div className="flex items-center gap-3">
             <img
               src="/app-icon.png"
-              alt="AssetForge"
+              alt="AssetFurnace"
               className="h-10 w-10 rounded-lg"
             />
             <div>
-              <h1 className="text-xl font-bold">AssetForge</h1>
+              <h1 className="text-xl font-bold">AssetFurnace</h1>
               <p className="text-xs text-muted-foreground">
                 Digital Asset Factory
               </p>
@@ -113,8 +113,8 @@ export function HeaderBar() {
                 hasApiKey === null
                   ? "Checking API key..."
                   : hasApiKey
-                  ? "API key configured"
-                  : "No API key configured"
+                    ? "API key configured"
+                    : "No API key configured"
               }
             >
               <Key className="h-5 w-5" />

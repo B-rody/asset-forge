@@ -14,7 +14,7 @@ const __dirname = dirname(__filename);
 
 const isWindows = process.platform === 'win32';
 
-console.log('🔨 Building AssetForge backend with Nuitka...\n');
+console.log('🔨 Building AssetFurnace backend with Nuitka...\n');
 
 const scriptPath = isWindows
   ? path.join(__dirname, 'build_backend.bat')

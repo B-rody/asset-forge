@@ -8,8 +8,8 @@ from typing import Optional
 from pydantic import BaseModel, Field
 from platformdirs import user_data_dir, user_config_dir
 
-APP_NAME = "AssetForge"
-APP_AUTHOR = "AssetForge"
+APP_NAME = "AssetFurnace"
+APP_AUTHOR = "AssetFurnace"
 
 
 class Settings(BaseModel):

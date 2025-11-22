@@ -3,7 +3,7 @@
 
 set -e
 
-echo "Building AssetForge backend with Nuitka..."
+echo "Building AssetFurnace backend with Nuitka..."
 
 cd backend
 

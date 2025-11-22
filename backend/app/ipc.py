@@ -16,7 +16,8 @@ class IPCServer:
     """JSON-Lines IPC server for stdio communication"""
 
     def __init__(self):
-        self.orchestrator = None  # Will be set based on mock mode
+        from app.pipeline.orchestrator import PipelineOrchestrator
+        self.orchestrator = PipelineOrchestrator()
     
     async def run(self):
         """Main IPC loop - read commands from stdin, send events to stdout"""
@@ -54,8 +55,8 @@ class IPCServer:
             params = command.get("params", {})
 
             # Determine which orchestrator to use based on mockMode
-            mock_mode = params.get("mockMode", False)
-            self._set_orchestrator(mock_mode)
+            # mock_mode = params.get("mockMode", False)
+            # self._set_orchestrator(mock_mode)
 
             await self.orchestrator.run_pipeline(mode, params, self.emit_event)
 
@@ -68,7 +69,7 @@ class IPCServer:
                 return
 
             # Use real orchestrator for building from idea
-            self._set_orchestrator(False)
+            # self._set_orchestrator(False)
 
             await self.orchestrator.run_from_idea(idea_id, self.emit_event)
 
@@ -83,7 +84,7 @@ class IPCServer:
                 return
 
             # Use real orchestrator for full build from idea
-            self._set_orchestrator(False)
+            # self._set_orchestrator(False)
 
             await self.orchestrator.run_full_from_idea(idea_id, self.emit_event)
 
@@ -96,7 +97,7 @@ class IPCServer:
                 return
 
             # Use real orchestrator for generating assets
-            self._set_orchestrator(False)
+            # self._set_orchestrator(False)
 
             await self.orchestrator.run_maker_from_bundle(bundle_id, self.emit_event)
 
@@ -109,7 +110,7 @@ class IPCServer:
                 return
 
             # Use real orchestrator for packaging
-            self._set_orchestrator(False)
+            # self._set_orchestrator(False)
 
             await self.orchestrator.run_packager_from_bundle(bundle_id, self.emit_event)
 
@@ -118,7 +119,7 @@ class IPCServer:
             # Skips research, goes straight to Planner → Maker → Packager
 
             # Use real orchestrator for quick build
-            self._set_orchestrator(False)
+            # self._set_orchestrator(False)
 
             await self.orchestrator.run_auto_from_existing_idea(self.emit_event)
 
@@ -127,7 +128,7 @@ class IPCServer:
                 logger.info("Handling get_available_ideas_count command")
 
                 # Ensure orchestrator is initialized
-                self._set_orchestrator(False)
+                # self._set_orchestrator(False)
 
                 from app.database.queries import IdeaQueries
                 idea_queries = IdeaQueries(self.orchestrator.db_manager)
@@ -153,7 +154,7 @@ class IPCServer:
             step = params.get("step")
 
             # Use mock orchestrator for re-runs (can be enhanced later)
-            self._set_orchestrator(True)
+            # self._set_orchestrator(True)
 
             await self.orchestrator.re_run_step(bundle_id, step, self.emit_event)
 
@@ -307,7 +308,7 @@ class IPCServer:
                 logger.info("Handling get_ideas command")
 
                 # Ensure orchestrator is initialized
-                self._set_orchestrator(False)
+                # self._set_orchestrator(False)
                 logger.debug(f"Orchestrator initialized: {type(self.orchestrator).__name__}")
 
                 params = command.get("params", {})
@@ -340,7 +341,7 @@ class IPCServer:
                 logger.info("Handling get_bundles command")
 
                 # Ensure orchestrator is initialized
-                self._set_orchestrator(False)
+                # self._set_orchestrator(False)
 
                 params = command.get("params", {})
                 limit = params.get("limit", 100)
@@ -366,7 +367,7 @@ class IPCServer:
                 logger.info("Handling get_ready_bundles command")
 
                 # Ensure orchestrator is initialized
-                self._set_orchestrator(False)
+                # self._set_orchestrator(False)
 
                 params = command.get("params", {})
                 limit = params.get("limit", 100)
@@ -392,7 +393,7 @@ class IPCServer:
                 logger.info("Handling get_generated_bundles command")
 
                 # Ensure orchestrator is initialized
-                self._set_orchestrator(False)
+                # self._set_orchestrator(False)
 
                 params = command.get("params", {})
                 limit = params.get("limit", 100)
@@ -418,7 +419,7 @@ class IPCServer:
                 logger.info("Handling get_activity_log command")
 
                 # Ensure orchestrator is initialized
-                self._set_orchestrator(False)
+                # self._set_orchestrator(False)
 
                 params = command.get("params", {})
                 limit = params.get("limit", 100)
@@ -444,7 +445,7 @@ class IPCServer:
                 logger.info("Handling get_library_stats command")
 
                 # Ensure orchestrator is initialized
-                self._set_orchestrator(False)
+                # self._set_orchestrator(False)
 
                 from app.database.queries import IdeaQueries, BundleQueries
                 idea_queries = IdeaQueries(self.orchestrator.db_manager)
@@ -472,7 +473,7 @@ class IPCServer:
                 logger.info("Handling get_research_sessions command")
 
                 # Ensure orchestrator is initialized
-                self._set_orchestrator(False)
+                # self._set_orchestrator(False)
 
                 params = command.get("params", {})
                 limit = params.get("limit", 100)
@@ -498,7 +499,7 @@ class IPCServer:
                 logger.info("Handling get_created_bundles command")
 
                 # Ensure orchestrator is initialized
-                self._set_orchestrator(False)
+                # self._set_orchestrator(False)
 
                 params = command.get("params", {})
                 limit = params.get("limit", 100)
@@ -566,7 +567,7 @@ class IPCServer:
                     return
 
                 # Ensure orchestrator is initialized
-                self._set_orchestrator(False)
+                # self._set_orchestrator(False)
 
                 from app.database.queries import IdeaQueries
                 idea_queries = IdeaQueries(self.orchestrator.db_manager)
@@ -599,7 +600,7 @@ class IPCServer:
                     return
 
                 # Ensure orchestrator is initialized
-                self._set_orchestrator(False)
+                # self._set_orchestrator(False)
 
                 from app.database.queries import BundleQueries
                 bundle_queries = BundleQueries(self.orchestrator.db_manager)
@@ -632,7 +633,7 @@ class IPCServer:
                     return
 
                 # Ensure orchestrator is initialized
-                self._set_orchestrator(False)
+                # self._set_orchestrator(False)
 
                 from app.database.queries import CreatedBundleQueries
                 created_bundle_queries = CreatedBundleQueries(self.orchestrator.db_manager)
@@ -739,15 +740,4 @@ class IPCServer:
             "message": message
         })
 
-    def _set_orchestrator(self, mock_mode: bool):
-        """Set orchestrator based on mock mode"""
-        if mock_mode:
-            from app.mock import MockPipelineOrchestrator
-            if not isinstance(self.orchestrator, MockPipelineOrchestrator):
-                logger.info("Switching to MOCK orchestrator")
-                self.orchestrator = MockPipelineOrchestrator()
-        else:
-            from app.pipeline.orchestrator import PipelineOrchestrator
-            if not isinstance(self.orchestrator, PipelineOrchestrator):
-                logger.info("Switching to REAL orchestrator")
-                self.orchestrator = PipelineOrchestrator()
+

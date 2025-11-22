@@ -207,8 +207,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   pendingDelete
                     ? "Key marked for deletion"
                     : hasExistingKey
-                    ? "••••••••••••••••"
-                    : "sk-..."
+                      ? "••••••••••••••••"
+                      : "sk-..."
                 }
                 className={cn(
                   "flex-1 rounded-md border px-3 py-2 text-sm",
@@ -240,7 +240,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               </p>
             ) : (
               <p className="mt-1 text-xs text-muted-foreground">
-                Your API key is stored in an encrypted file on your local device and never transmitted except to OpenAI. There are no AssetForge servers.
+                Your API key is stored in an encrypted file on your local device and never transmitted except to OpenAI. There are no AssetFurnace servers.
               </p>
             )}
             {error && (
@@ -284,10 +284,10 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   ? "Deleting..."
                   : "Validating..."
                 : saved
-                ? "Saved!"
-                : pendingDelete
-                ? "Confirm Delete"
-                : "Save"}
+                  ? "Saved!"
+                  : pendingDelete
+                    ? "Confirm Delete"
+                    : "Save"}
             </button>
           </div>
         </form>

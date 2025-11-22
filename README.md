@@ -1,4 +1,4 @@
-# AssetForge 🚀
+# AssetFurnace 🚀
 
 **One-Click Digital Asset Factory** – An autonomous, schema-driven pipeline that generates complete digital product bundles for marketplaces like Etsy and Gumroad.
 
@@ -6,7 +6,7 @@
 
 ## 🎯 What It Does
 
-AssetForge executes a local AI pipeline that:
+AssetFurnace executes a local AI pipeline that:
 
 1. **Researcher** – Finds and prioritizes profitable digital-product niches
 2. **Bundle Planner** – Designs the bundle (plan, assets, pricing, personas)
@@ -63,7 +63,7 @@ AssetForge executes a local AI pipeline that:
 
 ### External Dependencies
 
-AssetForge requires two external tools for document conversion. These are **not included** in the repository due to size constraints:
+AssetFurnace requires two external tools for document conversion. These are **not included** in the repository due to size constraints:
 
 #### 1. **Pandoc** (Required)
 - **Purpose**: Converts Markdown to various document formats
@@ -91,7 +91,7 @@ AssetForge requires two external tools for document conversion. These are **not 
     └── uninstall.exe
     ```
 
-> **Note**: The `.gitignore` already excludes `backend/bin/pandoc.exe` to prevent committing large binaries. Make sure to download these tools before running or building AssetForge.
+> **Note**: The `.gitignore` already excludes `backend/bin/pandoc.exe` to prevent committing large binaries. Make sure to download these tools before running or building AssetFurnace.
 
 ---
 
@@ -100,8 +100,8 @@ AssetForge requires two external tools for document conversion. These are **not 
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/B-rody/asset-forge.git
-cd asset-forge
+git clone https://github.com/B-rody/asset-furnace.git
+cd asset-furnace
 ```
 
 ### 2. Install External Dependencies
@@ -170,9 +170,9 @@ pnpm tauri dev
 5. Start generating! 🎉
 
 Your API key is stored encrypted locally at:
-- Windows: `%APPDATA%\AssetForge\.api_key.enc`
-- macOS: `~/Library/Application Support/AssetForge/.api_key.enc`
-- Linux: `~/.local/share/AssetForge/.api_key.enc`
+- Windows: `%APPDATA%\AssetFurnace\.api_key.enc`
+- macOS: `~/Library/Application Support/AssetFurnace/.api_key.enc`
+- Linux: `~/.local/share/AssetFurnace/.api_key.enc`
 
 ---
 
@@ -194,25 +194,14 @@ Your API key is stored encrypted locally at:
 #### Full Build (Recommended)
 
 ```bash
-# Build everything: frontend, backend, and installer
+# Build everything: frontend, backend, and portable ZIP
 pnpm build
 ```
 
 This will:
 1. Build the optimized React frontend (`ui/dist/`)
 2. Compile Python backend to native binary with Nuitka (`backend/bin/main.dist/`)
-3. Bundle everything into a Tauri installer
-
-**Output locations:**
-- **Windows**: `src-tauri/target/release/bundle/nsis/AssetForge_1.1.0_x64-setup.exe`
-- **macOS**: `src-tauri/target/release/bundle/dmg/AssetForge_1.1.0_x64.dmg`
-- **Linux**: `src-tauri/target/release/bundle/deb/assetforge_1.1.0_amd64.deb`
-
-#### Component-Specific Builds
-
-```bash
-# Build frontend only
-pnpm ui:build
+3. Create a portable ZIP at `dist/AssetFurnace-Portable.zip`
 
 # Build backend only (Nuitka compilation)
 pnpm backend:build
@@ -236,7 +225,6 @@ The build process is configured in:
 - External tools (Pandoc, wkhtmltopdf) embedded in the binary
 - Encrypted prompts and schemas
 - React frontend assets
-- License file
 
 ### Troubleshooting Builds
 
@@ -252,8 +240,8 @@ The build process is configured in:
   2. Ensure Python 3.11+ is installed
   3. Try building with `--jobs=1` flag in build script for better error messages
 
-**Issue**: Installer size is too large
-- **Solution**: This is expected (200-300MB) due to bundled Python runtime, AI dependencies, and external tools
+**Issue**: ZIP file size is large
+- **Solution**: This is expected (~120MB) due to bundled Python runtime, AI dependencies, and external tools
 
 ---
 
@@ -262,7 +250,7 @@ The build process is configured in:
 ## 📁 Project Structure
 
 ```
-AssetForge/
+AssetFurnace/
 ├── ui/                       # React frontend (Vite + TypeScript)
 │   ├── src/
 │   │   ├── components/       # UI components
@@ -308,7 +296,7 @@ Re-execute a specific pipeline step:
 - **Encrypted API Key**: API keys stored in an encrypted file on your local device, managed entirely by the app
 - **Compiled Binary**: Python backend compiled with Nuitka for IP protection
 - **No Network Server**: All communication via stdio (no HTTP server exposure)
-- **No AssetForge Servers**: Your data and API key never leave your device except to call OpenAI's API
+- **No AssetFurnace Servers**: Your data and API key never leave your device except to call OpenAI's API
 
 ## 📊 IPC Protocol
 
@@ -341,11 +329,11 @@ pnpm backend:build
 
 ## 📝 License
 
-Proprietary Software - see [LICENSE](LICENSE) file for complete terms and conditions.
+This project is open-source. Contributions and feedback are welcome!
 
 ## 💡 Support
 
-For questions about using AssetForge, click the Help button (?) in the app's header bar for comprehensive documentation and tutorials.
+For questions about using AssetFurnace, click the Help button (?) in the app's header bar for comprehensive documentation and tutorials.
 
 ---
 

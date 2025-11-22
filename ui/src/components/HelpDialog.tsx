@@ -28,7 +28,7 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
         <div className="flex items-center justify-between p-6 border-b border-border">
           <div className="flex items-center gap-2">
             <BookOpen className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">AssetForge Help</h2>
+            <h2 className="text-lg font-semibold">AssetFurnace Help</h2>
           </div>
           <button
             onClick={() => onOpenChange(false)}
@@ -97,7 +97,7 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
             )}
           >
             <FileText className="h-4 w-4" />
-            About & License
+            About
           </button>
         </div>
 
@@ -118,33 +118,33 @@ function GettingStartedContent() {
   return (
     <div className="space-y-6 prose prose-sm dark:prose-invert max-w-none">
       <div>
-        <h3 className="text-lg font-semibold mb-3">Welcome to AssetForge</h3>
+        <h3 className="text-lg font-semibold mb-3">Welcome to AssetFurnace</h3>
         <p className="text-muted-foreground">
-          AssetForge is an autonomous AI pipeline that researches, designs, and generates complete digital product bundles ready for marketplaces like Etsy and Gumroad.
+          AssetFurnace is an autonomous AI pipeline that researches, designs, and generates complete digital product bundles ready for marketplaces like Etsy and Gumroad.
         </p>
       </div>
 
       <div>
         <h4 className="font-semibold mb-2">1. Get Your OpenAI API Key</h4>
         <p className="text-sm text-muted-foreground mb-2">
-          AssetForge uses OpenAI's models to power its AI pipeline. You'll need an API key:
+          AssetFurnace uses OpenAI's models to power its AI pipeline. You'll need an API key:
         </p>
         <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground ml-4">
           <li>Visit <code className="px-1 py-0.5 bg-muted rounded text-xs">platform.openai.com/api-keys</code></li>
           <li>Sign in or create an account</li>
           <li>Click "Create new secret key"</li>
           <li>Copy the key (starts with <code className="px-1 py-0.5 bg-muted rounded text-xs">sk-...</code>)</li>
-          <li>Paste it into AssetForge Settings (⚙️ icon in header)</li>
+          <li>Paste it into AssetFurnace Settings (⚙️ icon in header)</li>
         </ol>
         <p className="text-xs text-muted-foreground mt-2 bg-blue-50 dark:bg-blue-950/30 p-3 rounded border border-blue-200 dark:border-blue-900">
-          <strong>Note:</strong> Your API key is stored in an encrypted file on your local device and never transmitted except to OpenAI's servers. There are no AssetForge servers.
+          <strong>Note:</strong> Your API key is stored in an encrypted file on your local device and never transmitted except to OpenAI's servers. There are no AssetFurnace servers.
         </p>
       </div>
 
       <div>
         <h4 className="font-semibold mb-2">2. Choose Your Workflow</h4>
         <p className="text-sm text-muted-foreground mb-2">
-          AssetForge offers different modes depending on how much control you want:
+          AssetFurnace offers different modes depending on how much control you want:
         </p>
         <ul className="list-disc list-inside space-y-2 text-sm text-muted-foreground ml-4">
           <li><strong>Research Ideas:</strong> Generate product ideas without building anything yet</li>
@@ -186,7 +186,7 @@ function PipelineContent() {
       <div>
         <h3 className="text-lg font-semibold mb-3">Understanding the 4-Step Pipeline</h3>
         <p className="text-muted-foreground">
-          AssetForge uses a structured AI pipeline to create complete digital product bundles:
+          AssetFurnace uses a structured AI pipeline to create complete digital product bundles:
         </p>
       </div>
 
@@ -359,80 +359,18 @@ function AboutContent() {
   return (
     <div className="space-y-6 prose prose-sm dark:prose-invert max-w-none">
       <div>
-        <h3 className="text-lg font-semibold mb-3">About AssetForge</h3>
+        <h3 className="text-lg font-semibold mb-3">About AssetFurnace</h3>
         <div className="space-y-2 text-sm text-muted-foreground">
-          <p><strong>Version:</strong> 1.0.7</p>
-          <p><strong>Copyright:</strong> © 2025 AssetForge. All Rights Reserved.</p>
+          <p><strong>Version:</strong> 1.1.2</p>
+          <p><strong>Copyright:</strong> © 2025 AssetFurnace. All Rights Reserved.</p>
           <p><strong>Description:</strong> One-Click Digital Asset Factory - An autonomous, schema-driven pipeline that generates complete digital product bundles for marketplaces.</p>
         </div>
       </div>
 
-      <div>
-        <h4 className="font-semibold mb-3">Software License Agreement</h4>
-        <div className="bg-muted rounded-lg p-4 text-xs font-mono overflow-y-auto max-h-96 whitespace-pre-wrap border border-border">
-{`PROPRIETARY SOFTWARE LICENSE AGREEMENT
-
-Copyright (c) 2025 AssetForge. All Rights Reserved.
-
-This software and associated documentation files (the "Software") are proprietary
-and confidential to AssetForge.
-
-GRANT OF LICENSE
-
-Subject to the terms of this Agreement and payment of the applicable license fee,
-you are granted a limited, non-exclusive, non-transferable license to:
-
-1. Install and use the Software on devices you own or control
-2. Use the Software for personal or commercial purposes
-
-RESTRICTIONS
-
-You may NOT:
-
-1. Distribute, sell, lease, rent, lend, or sublicense the Software
-2. Modify, reverse engineer, decompile, or disassemble the Software
-3. Remove or alter any proprietary notices or labels on the Software
-4. Share your copy of the Software with others
-5. Use the Software to provide services to third parties
-6. Create derivative works based on the Software
-
-INTELLECTUAL PROPERTY
-
-All title, ownership rights, and intellectual property rights in and to the
-Software remain with AssetForge. The Software is protected by copyright laws
-and international treaty provisions.
-
-TERMINATION
-
-This license is effective until terminated. Your rights under this license will
-terminate automatically without notice if you fail to comply with any term of
-this Agreement.
-
-NO WARRANTY
-
-THE SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
-INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-PARTICULAR PURPOSE, AND NONINFRINGEMENT. THE ENTIRE RISK AS TO THE QUALITY AND
-PERFORMANCE OF THE SOFTWARE IS WITH YOU.
-
-LIMITATION OF LIABILITY
-
-IN NO EVENT SHALL ASSETFORGE BE LIABLE FOR ANY SPECIAL, INCIDENTAL, INDIRECT, OR
-CONSEQUENTIAL DAMAGES WHATSOEVER (INCLUDING, WITHOUT LIMITATION, DAMAGES FOR LOSS
-OF BUSINESS PROFITS, BUSINESS INTERRUPTION, LOSS OF BUSINESS INFORMATION, OR ANY
-OTHER PECUNIARY LOSS) ARISING OUT OF THE USE OF OR INABILITY TO USE THE SOFTWARE.
-
-GOVERNING LAW
-
-This Agreement shall be governed by and construed in accordance with the laws of
-the jurisdiction in which AssetForge operates, without regard to its conflict of
-law provisions.
-
-By installing or using the Software, you acknowledge that you have read this
-Agreement, understand it, and agree to be bound by its terms and conditions.`}
-        </div>
-        <p className="text-xs text-muted-foreground mt-3">
-          By using AssetForge, you acknowledge that you have read and agree to this license agreement.
+      <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded">
+        <h4 className="font-semibold mb-2">Open Source</h4>
+        <p className="text-sm text-muted-foreground">
+          AssetFurnace is an open-source project. Contributions and feedback are welcome!
         </p>
       </div>
     </div>
@@ -448,7 +386,7 @@ function FAQContent() {
         <div>
           <h4 className="font-semibold text-sm mb-1">How much does it cost to run?</h4>
           <p className="text-sm text-muted-foreground">
-            AssetForge itself is a one-time purchase, but it uses your OpenAI API key.
+            AssetFurnace itself is a one-time purchase, but it uses your OpenAI API key.
             As of October 2025, running the full auto pipeline (research, auto-pick, and generate) typically costs 20-50 cents in API usage.
             You only pay for what you generate. Note that costs may change as OpenAI API pricing changes.
           </p>
@@ -474,7 +412,7 @@ function FAQContent() {
           <h4 className="font-semibold text-sm mb-1">Is my API key secure?</h4>
           <p className="text-sm text-muted-foreground">
             Yes! Your API key is stored in an encrypted file on your local device, managed entirely by the app.
-            It's never transmitted anywhere except directly to OpenAI's API. There are no AssetForge servers.
+            It's never transmitted anywhere except directly to OpenAI's API. There are no AssetFurnace servers.
           </p>
         </div>
 
@@ -489,7 +427,7 @@ function FAQContent() {
         <div>
           <h4 className="font-semibold text-sm mb-1">What if the pipeline fails mid-way?</h4>
           <p className="text-sm text-muted-foreground">
-            Don't worry! AssetForge saves progress at each step. If the Maker step fails, your bundle plan is still
+            Don't worry! AssetFurnace saves progress at each step. If the Maker step fails, your bundle plan is still
             saved in Library → Ready to Make. Just click "Generate Assets" again to retry.
           </p>
         </div>
@@ -497,7 +435,7 @@ function FAQContent() {
         <div>
           <h4 className="font-semibold text-sm mb-1">Can I run multiple bundles at once?</h4>
           <p className="text-sm text-muted-foreground">
-            Not currently - AssetForge processes one bundle at a time to ensure quality. Queue up multiple ideas
+            Not currently - AssetFurnace processes one bundle at a time to ensure quality. Queue up multiple ideas
             in your Library and process them sequentially.
           </p>
         </div>

@@ -1,7 +1,7 @@
 @echo off
 REM Build Python backend with Nuitka (Windows)
 
-echo Building AssetForge backend with Nuitka...
+echo Building AssetFurnace backend with Nuitka...
 
 cd backend
 

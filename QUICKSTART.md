@@ -1,4 +1,4 @@
-# AssetForge - Quick Start Guide
+# AssetFurnace - Quick Start Guide
 
 ## Prerequisites
 
@@ -136,7 +136,7 @@ pnpm backend:dev      # Run backend only
 # Building
 pnpm ui:build         # Build frontend to ui/dist
 pnpm backend:build    # Compile Python to binary with Nuitka
-pnpm build            # Build everything + create installer
+pnpm build            # Build everything + create portable ZIP
 
 # Previewing
 pnpm ui:preview       # Preview built frontend
@@ -145,7 +145,7 @@ pnpm ui:preview       # Preview built frontend
 ## 🏗️ Project Structure
 
 ```
-AssetForge/
+AssetFurnace/
 ├── ui/src/              # React frontend
 │   ├── components/      # UI components
 │   ├── lib/             # Utilities & IPC
@@ -170,7 +170,7 @@ AssetForge/
 **Answer:** First compile takes 5-10 minutes. This is normal! Grab a coffee ☕
 
 ### Backend not responding in UI
-**Status:** Currently using mock IPC in dev mode. Real sidecar integration pending.
+**Solution:** Check that your OpenAI API key is configured in Settings. The backend communicates via stdio IPC.
 
 ### TypeScript errors everywhere
 **Solution:** Install dependencies with `pnpm install`. Errors will disappear.
@@ -184,12 +184,12 @@ AssetForge/
 4. ✅ Integrate real OpenAI API calls
 
 ### For Production
-1. ⬜ Replace mock agents with real AI calls
-2. ⬜ Add actual asset generation (PDF, images)
-3. ⬜ Connect Tauri sidecar to Python binary
-4. ⬜ Add error handling and retry logic
-5. ⬜ Create proper app icons
-6. ⬜ Build and test installers
+1. ✅ Backend integrated with OpenAI API
+2. ✅ Asset generation (PDF, images) working
+3. ✅ Tauri communicates with Python backend via stdio
+4. ⬜ Add more error handling and retry logic
+5. ⬜ Create custom app icons
+6. ⬜ Test portable ZIP on different systems
 
 ## 📖 Learn More
 

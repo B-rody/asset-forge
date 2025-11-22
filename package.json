@@ -1,14 +1,14 @@
 {
-  "name": "assetforge",
+  "name": "assetfurnace",
   "private": true,
   "version": "1.1.2",
   "type": "module",
   "description": "One-Click Digital Asset Factory",
-  "author": "AssetForge Team",
+  "author": "Asset Furnace Team",
   "license": "UNLICENSED",
   "scripts": {
     "dev": "tauri dev",
-    "build": "concurrently \"pnpm ui:build\" \"pnpm backend:build\" && tauri build",
+    "build": "concurrently \"pnpm ui:build\" \"pnpm backend:build\" && tauri build && powershell -ExecutionPolicy Bypass -File scripts/create_zip.ps1",
     "ui:dev": "vite",
     "ui:build": "tsc && vite build",
     "ui:preview": "vite preview",

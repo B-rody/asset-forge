@@ -7,7 +7,7 @@
     "withGlobalTauri": false
   },
   "package": {
-    "productName": "AssetForge",
+    "productName": "AssetFurnace",
     "version": "1.1.0"
   },
   "tauri": {
@@ -24,7 +24,10 @@
         "readFile": true,
         "writeFile": true,
         "readDir": true,
-        "scope": ["$APPDATA/assetforge/*", "$RESOURCE/*"]
+        "scope": [
+          "$APPDATA/assetfurnace/*",
+          "$RESOURCE/*"
+        ]
       },
       "path": {
         "all": true
@@ -39,7 +42,7 @@
     "bundle": {
       "active": true,
       "category": "Productivity",
-      "copyright": "Copyright © 2025 AssetForge",
+      "copyright": "Copyright © 2025 Asset Furnace",
       "deb": {
         "depends": []
       },
@@ -51,7 +54,7 @@
         "icons/icon.icns",
         "icons/icon.ico"
       ],
-      "identifier": "com.assetforge.app",
+      "identifier": "com.assetfurnace.app",
       "longDescription": "One-Click Digital Asset Factory - An autonomous, schema-driven pipeline that generates complete digital product bundles for marketplaces like Etsy and Gumroad.",
       "macOS": {
         "entitlements": null,
@@ -61,21 +64,16 @@
         "signingIdentity": null
       },
       "resources": [
-        "../backend/bin/main.dist",
-        "../LICENSE"
+        "../backend/bin/main.dist"
       ],
       "shortDescription": "Digital Asset Factory",
-      "targets": "all",
+      "targets": [
+        "updater"
+      ],
       "windows": {
         "certificateThumbprint": null,
         "digestAlgorithm": "sha256",
-        "timestampUrl": "",
-        "nsis": {
-          "installerIcon": "icons/icon.ico",
-          "license": "../LICENSE",
-          "headerImage": "images/installer-header.bmp",
-          "sidebarImage": "images/installer-sidebar.bmp"
-        }
+        "timestampUrl": ""
       }
     },
     "security": {
@@ -88,7 +86,7 @@
       {
         "fullscreen": false,
         "resizable": true,
-        "title": "AssetForge",
+        "title": "AssetFurnace",
         "width": 1200,
         "height": 800,
         "minWidth": 1100,

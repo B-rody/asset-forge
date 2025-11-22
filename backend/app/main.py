@@ -1,5 +1,5 @@
 """
-AssetForge Backend - Main Entry Point
+Asset Furnace Backend - Main Entry Point
 Stdio-based JSON-Lines IPC server
 """
 
@@ -9,7 +9,7 @@ import asyncio
 # Add verbose startup logging to catch import errors
 def startup_diagnostic():
     """Log startup diagnostics to stderr for debugging"""
-    print("=== AssetForge Backend Startup Diagnostics ===", file=sys.stderr)
+    print("=== Asset Furnace Backend Startup Diagnostics ===", file=sys.stderr)
     print(f"Python version: {sys.version}", file=sys.stderr)
     print(f"Executable: {sys.executable}", file=sys.stderr)
     print("Attempting imports...", file=sys.stderr)
@@ -42,7 +42,7 @@ logger = setup_logger(__name__)
 async def main():
     """Main entry point for the backend"""
     try:
-        logger.info("AssetForge Backend starting...")
+        logger.info("Asset Furnace Backend starting...")
 
         # Initialize IPC server (orchestrator will be set based on mock mode)
         ipc = IPCServer()
